@@ -31,16 +31,19 @@ wss.on('connection', (ws) => {
   // Handle incoming messages from clients
   ws.on('message', (message) => {
     try {
-      console.log('Received:', message);
+      // Convert buffer to string if needed
+      let messageStr = message.toString().trim();
+      console.log('Received:', messageStr);
       
       // Broadcast raw message to all connected clients
       wss.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
-          client.send(message);
+          client.send(messageStr);
         }
       });
     } catch (error) {
       console.error('Error processing message:', error);
+      ws.send('ERROR: ' + error.message);
     }
   });
 
