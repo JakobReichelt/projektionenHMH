@@ -21,12 +21,8 @@ wss.on('connection', (ws) => {
   console.log('Client connected. Total clients:', wss.clients.size);
   clients.add(ws);
 
-  // Send welcome message
-  ws.send(JSON.stringify({
-    type: 'connection',
-    message: 'Connected to WebSocket server',
-    timestamp: new Date().toISOString()
-  }));
+  // Send simple welcome message
+  ws.send('CONNECTED');
 
   // Handle incoming messages from clients
   ws.on('message', (message) => {
