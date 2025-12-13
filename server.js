@@ -33,14 +33,10 @@ wss.on('connection', (ws) => {
     try {
       console.log('Received:', message);
       
-      // Broadcast to all connected clients
+      // Broadcast raw message to all connected clients
       wss.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({
-            type: 'message',
-            data: JSON.parse(message),
-            timestamp: new Date().toISOString()
-          }));
+          client.send(message);
         }
       });
     } catch (error) {

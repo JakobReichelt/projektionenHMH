@@ -335,13 +335,10 @@
 
         function sendButton(buttonName) {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                const message = {
-                    type: 'button_press',
-                    button: buttonName,
-                    timestamp: new Date().toISOString()
-                };
+                // Extract button number (1, 2, or 3)
+                const buttonNumber = buttonName.replace('button', '');
                 
-                sendMessage(message);
+                sendMessage(buttonNumber);
                 updateFeedback(`Button pressed: ${buttonName}`);
                 
                 // Add pulse animation
@@ -357,8 +354,8 @@
 
         function sendMessage(data) {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify(data));
-                addLog(`📤 Sent: ${data.type} - ${data.button || data.value || ''}`);
+                ws.send(data.toString());
+                addLog(`📤 Sent: ${data}`);
                 console.log('Sent:', data);
             }
         }
