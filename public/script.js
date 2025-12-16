@@ -45,9 +45,8 @@ const updateStageDisplay = (stageId) => {
     text.onclick = () => {
       if (STATE.ws?.readyState === WebSocket.OPEN) {
         STATE.ws.send('2');
-        STATE.currentStage = 'video2-looping';
-        handleInteraction();
       }
+      handleInteraction();
     };
   } else if (stageId === 'video4-looping') {
     STATE.allowInteraction = true;
@@ -94,21 +93,21 @@ const handleInteraction = () => {
   if (STATE.hasInteracted) return;
   STATE.hasInteracted = true;
 
-  switch (STATE.currentState) {
+  switch (STATE.currentStage) {
     case 'video2-looping':
       playVideo('video3', () => {
         playVideo('video4', null, true);
-        STATE.currentState = 'video4-looping';
+        STATE.currentStage = 'video4-looping';
         updateStageDisplay('video4-looping');
         STATE.hasInteracted = false;
       });
-      STATE.currentState = 'video3-playing';
+      STATE.currentStage = 'video3-playing';
       updateStageDisplay('video3');
       break;
 
     case 'video4-looping':
       playVideo('video5', null, true);
-      STATE.currentState = 'video5-looping';
+      STATE.currentStage = 'video5-looping';
       updateStageDisplay('video5');
       break;
   }
@@ -131,18 +130,18 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') {
     if (STATE.allowInteraction) {
       handleInteraction();
-    } else if (STATE.currentState === 'video2-looping') {
+    } else if (STATE.currentStage === 'video2-looping') {
       const text = document.getElementById('stageText');
       text.onclick?.();
     }
   } else if (e.key === 'ArrowLeft') {
-    if (STATE.currentState === 'video3-playing') {
-      STATE.currentState = 'video2-looping';
+    if (STATE.currentStage === 'video3-playing') {
+      STATE.currentStage = 'video2-looping';
       STATE.hasInteracted = false;
       STATE.allowInteraction = false;
       updateStageDisplay('video2-looping');
-    } else if (STATE.currentState === 'video5-looping') {
-      STATE.currentState = 'video4-looping';
+    } else if (STATE.currentStage === 'video5-looping') {
+      STATE.currentStage = 'video4-looping';
       STATE.hasInteracted = false;
       updateStageDisplay('video4-looping');
     }
