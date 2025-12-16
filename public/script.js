@@ -3,6 +3,83 @@ let reconnectAttempts = 0;
 const maxReconnectAttempts = 5;
 const reconnectDelay = 3000;
 
+// Video sequence state
+let currentState = 'idle';
+let hasInteracted = false;
+const videos = {
+    video1: document.getElementById('video1'),
+    video2: document.getElementById('video2'),
+    video3: document.getElementById('video3'),
+    video4: document.getElementById('video4'),
+    video5: document.getElementById('video5')
+};
+
+function initializeVideoSequence() {
+    console.log('Initializing video sequence...');
+    
+    // Play video 1
+    playVideo('video1', () => {
+        console.log('Video 1 finished, playing Video 2');
+        playVideo('video2', null, true); // Video 2 loops
+        currentState = 'video2-looping';
+        hasInteracted = false;
+    });
+}
+
+function playVideo(videoId, onEnded = null, isLooping = false) {
+    // Hide all videos
+    Object.keys(videos).forEach(id => {
+        videos[id].classList.remove('active');
+    });
+    
+    const video = videos[videoId];
+    video.classList.add('active');
+    
+    if (!isLooping) {
+        video.loop = false;
+    }
+    
+    if (onEnded) {
+        video.onended = onEnded;
+    }
+    
+    video.currentTime = 0;
+    video.play().catch(err => console.error('Video play error:', err));
+}
+
+function handleInteraction() {
+    if (hasInteracted) return; // Ignore multiple interactions
+    hasInteracted = true;
+    console.log('User interaction detected, state:', currentState);
+    
+    if (currentState === 'video2-looping') {
+        // Transition from video 2 to video 3
+        playVideo('video3', () => {
+            console.log('Video 3 finished, playing Video 4');
+            playVideo('video4', null, true); // Video 4 loops
+            currentState = 'video4-looping';
+            hasInteracted = false;
+        });
+        currentState = 'video3-playing';
+    } else if (currentState === 'video4-looping') {
+        // Transition from video 4 to video 5
+        playVideo('video5', () => {
+            console.log('Video 5 finished, sequence complete');
+            currentState = 'sequence-complete';
+        });
+        currentState = 'video5-playing';
+    }
+}
+
+// Add interaction listeners
+document.addEventListener('touchstart', handleInteraction);
+document.addEventListener('click', (e) => {
+    // Only trigger on non-button clicks
+    if (!e.target.classList.contains('main-button') && !e.target.classList.contains('debug-toggle')) {
+        handleInteraction();
+    }
+});
+
 function toggleDebugPanel() {
     const debugPanel = document.getElementById('debugPanel');
     debugPanel.classList.toggle('show');
@@ -131,7 +208,13 @@ function addLog(message) {
 }
 
 // Connect on page load
-window.addEventListener('load', connectWebSocket);
+window.addEventListener('load', () => {
+    connectWebSocket();
+    // Start video sequence when page loads
+    setTimeout(() => {
+        initializeVideoSequence();
+    }, 500); // Small delay to ensure videos are ready
+});
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
