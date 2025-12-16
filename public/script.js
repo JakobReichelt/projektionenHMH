@@ -45,7 +45,7 @@ const updateStageDisplay = (stageId) => {
     text.onclick = () => {
       if (STATE.ws?.readyState === WebSocket.OPEN) {
         STATE.ws.send('2');
-        STATE.allowInteraction = true;
+        STATE.currentStage = 'video2-looping';
         handleInteraction();
       }
     };
