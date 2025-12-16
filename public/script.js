@@ -1,393 +1,253 @@
-let ws;
-let reconnectAttempts = 0;
-const maxReconnectAttempts = 5;
-const reconnectDelay = 3000;
-
-// ===== STAGE MANAGER CONFIGURATION =====
-// Define content for each stage/video
-const stageContent = {
-    video1: {
-        title: '',
-        text: ''
-    },
-    'video2-looping': {
-        title: 'Willst du auch mal schießen?',
-        text: 'Ja   /    Nein'
-    },
-    video3: {
-        title: '',
-        text: ''
-    },
-    'video4-looping': {
-        title: '↑',
-        text: 'schau hoch'
-    },
-    video5: {
-        title: 'Niki De Saint Phalle schießt auf die Welt',
-        text: 'Ob sie es beim Hannover Schützenfest auch gelernt hat?'
-    }
+// ===== STATE MANAGEMENT =====
+const STATE = {
+  ws: null,
+  currentStage: 'video1',
+  hasInteracted: false,
+  allowInteraction: true,
+  reconnectAttempts: 0,
+  iosInitiated: false,
+  videos: {},
+  isIOS: CONFIG.isIOS()
 };
-// ===== END STAGE MANAGER CONFIGURATION =====
 
-// Video sequence state
-let currentState = 'idle';
-let hasInteracted = false;
-let allowNormalInteraction = true; // Flag to control if regular clicks trigger interaction
-const videos = {
+// Cache video elements on load
+const initVideos = () => {
+  STATE.videos = {
     video1: document.getElementById('video1'),
     video2: document.getElementById('video2'),
     video3: document.getElementById('video3'),
     video4: document.getElementById('video4'),
     video5: document.getElementById('video5')
+  };
 };
 
-function updateStageDisplay(stageName) {
-    const stage = stageContent[stageName];
-    const titleElement = document.getElementById('stageTitle');
-    const textElement = document.getElementById('stageText');
-    const stageDisplay = document.querySelector('.stage-display');
-    
-    if (stage) {
-        // Set text content (or empty string)
-        if (titleElement) titleElement.textContent = stage.title || '';
-        if (textElement) textElement.textContent = stage.text || '';
-        
-        // Remove previous styling
-        textElement.classList.remove('interactive', 'black-text');
-        titleElement.classList.remove('black-text');
-        stageDisplay.classList.remove('interactive');
-        textElement.onclick = null;
-        
-        // Make video2-looping stage text clickable and send message
-        if (stageName === 'video2-looping') {
-            allowNormalInteraction = false; // Disable regular interactions
-            stageDisplay.classList.add('interactive');
-            textElement.classList.add('interactive');
-            textElement.onclick = () => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send('2');
-                    console.log('Sent: 2');
-                    allowNormalInteraction = true; // Re-enable for next stage
-                    handleInteraction();
-                }
-            };
-        } else if (stageName === 'video4-looping') {
-            allowNormalInteraction = true; // Enable regular interactions for 4th stage
-            // Make 4th stage text black
-            titleElement.classList.add('black-text');
-            textElement.classList.add('black-text');
-        } else {
-            allowNormalInteraction = true; // Enable for other stages
-        }
-        
-        console.log(`Stage updated: ${stageName} - "${stage.title}"`);
-    }
-}
+// ===== STAGE DISPLAY =====
+const updateStageDisplay = (stageId) => {
+  const stage = CONFIG.getStage(stageId);
+  if (!stage) return;
 
-function initializeVideoSequence() {
-    console.log('Initializing video sequence...');
-    
-    // Clear initial stage display
-    const titleElement = document.getElementById('stageTitle');
-    const textElement = document.getElementById('stageText');
-    if (titleElement) titleElement.textContent = '';
-    if (textElement) textElement.textContent = '';
-    
-    // Play video 1
-    playVideo('video1', () => {
-        console.log('Video 1 finished, playing Video 2');
-        playVideo('video2', null, true); // Video 2 loops
-        currentState = 'video2-looping';
-        updateStageDisplay('video2-looping');
-        hasInteracted = false;
-    });
-}
+  const title = document.getElementById('stageTitle');
+  const text = document.getElementById('stageText');
+  const display = document.querySelector('.stage-display');
 
-function playVideo(videoId, onEnded = null, isLooping = false) {
-    // Hide all videos
-    Object.keys(videos).forEach(id => {
-        videos[id].classList.remove('active');
-        videos[id].pause();
-    });
-    
-    const video = videos[videoId];
-    video.classList.add('active');
-    
-    if (!isLooping) {
-        video.loop = false;
-    }
-    
-    if (onEnded) {
-        video.onended = onEnded;
-    }
-    
-    video.currentTime = 0;
-    
-    // Use promise-based play for better iOS compatibility
-    const playPromise = video.play();
-    if (playPromise !== undefined) {
-        playPromise
-            .then(() => {
-                console.log(`${videoId} is playing`);
-            })
-            .catch(err => {
-                console.error(`Failed to play ${videoId}:`, err);
-            });
-    }
-}
+  title.textContent = stage.title || '';
+  text.textContent = stage.text || '';
+  text.classList.remove('interactive', 'black-text');
+  title.classList.remove('black-text');
+  display.classList.remove('interactive');
+  text.onclick = null;
 
-function handleInteraction() {
-    if (hasInteracted) return; // Ignore multiple interactions
-    hasInteracted = true;
-    console.log('User interaction detected, state:', currentState);
-    
-    if (currentState === 'video2-looping') {
-        // Transition from video 2 to video 3
-        playVideo('video3', () => {
-            console.log('Video 3 finished, playing Video 4');
-            playVideo('video4', null, true); // Video 4 loops
-            currentState = 'video4-looping';
-            updateStageDisplay('video4-looping');
-            hasInteracted = false;
-        });
-        currentState = 'video3-playing';
-        updateStageDisplay('video3');
-    } else if (currentState === 'video4-looping') {
-        // Transition from video 4 to video 5
-        playVideo('video5', null, true); // Video 5 loops indefinitely
-        currentState = 'video5-looping';
-        updateStageDisplay('video5');
-    }
-}
-
-// Add interaction listeners
-document.addEventListener('touchstart', () => {
-    if (allowNormalInteraction) handleInteraction();
-});
-document.addEventListener('click', (e) => {
-    // Only trigger on non-button clicks if interaction is allowed
-    if (allowNormalInteraction && !e.target.classList.contains('main-button') && !e.target.classList.contains('debug-toggle') && !e.target.classList.contains('interactive')) {
+  // Special handling for interactive stages
+  if (stageId === 'video2-looping') {
+    STATE.allowInteraction = false;
+    display.classList.add('interactive');
+    text.classList.add('interactive');
+    text.onclick = () => {
+      if (STATE.ws?.readyState === WebSocket.OPEN) {
+        STATE.ws.send('2');
+        STATE.allowInteraction = true;
         handleInteraction();
-    }
+      }
+    };
+  } else if (stageId === 'video4-looping') {
+    STATE.allowInteraction = true;
+    title.classList.add('black-text');
+    text.classList.add('black-text');
+  } else {
+    STATE.allowInteraction = true;
+  }
+
+  console.log(`Stage: ${stageId}`);
+};
+
+// ===== VIDEO PLAYBACK =====
+const playVideo = (videoId, onEnded = null, isLooping = false) => {
+  Object.values(STATE.videos).forEach(v => {
+    v.classList.remove('active');
+    v.pause();
+  });
+
+  const video = STATE.videos[videoId];
+  video.classList.add('active');
+  video.loop = isLooping;
+  video.onended = onEnded;
+  video.currentTime = 0;
+
+  (video.play() || Promise.resolve())
+    .catch(err => console.error(`Failed to play ${videoId}:`, err));
+};
+
+const initializeVideoSequence = () => {
+  document.getElementById('stageTitle').textContent = '';
+  document.getElementById('stageText').textContent = '';
+  
+  playVideo('video1', () => {
+    playVideo('video2', null, true);
+    STATE.currentStage = 'video2-looping';
+    updateStageDisplay('video2-looping');
+    STATE.hasInteracted = false;
+  });
+};
+
+// ===== INTERACTION HANDLING =====
+const handleInteraction = () => {
+  if (STATE.hasInteracted) return;
+  STATE.hasInteracted = true;
+
+  switch (STATE.currentState) {
+    case 'video2-looping':
+      playVideo('video3', () => {
+        playVideo('video4', null, true);
+        STATE.currentState = 'video4-looping';
+        updateStageDisplay('video4-looping');
+        STATE.hasInteracted = false;
+      });
+      STATE.currentState = 'video3-playing';
+      updateStageDisplay('video3');
+      break;
+
+    case 'video4-looping':
+      playVideo('video5', null, true);
+      STATE.currentState = 'video5-looping';
+      updateStageDisplay('video5');
+      break;
+  }
+};
+
+// Interaction listeners
+document.addEventListener('touchstart', () => {
+  if (STATE.allowInteraction) handleInteraction();
 });
 
-// Arrow key navigation for testing without videos
+document.addEventListener('click', (e) => {
+  const isButton = e.target.classList.contains('main-button') || 
+                   e.target.classList.contains('debug-toggle') || 
+                   e.target.classList.contains('interactive');
+  if (STATE.allowInteraction && !isButton) handleInteraction();
+});
+
+// Keyboard navigation
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowRight') {
-        console.log('Right arrow pressed - advancing stage');
-        if (allowNormalInteraction) {
-            handleInteraction();
-        } else if (currentState === 'video2-looping') {
-            // For video2, simulate button click
-            const textElement = document.getElementById('stageText');
-            if (textElement && textElement.onclick) {
-                textElement.onclick();
-            }
-        }
-    } else if (e.key === 'ArrowLeft') {
-        console.log('Left arrow pressed - going back');
-        // Simple back functionality
-        if (currentState === 'video3-playing') {
-            currentState = 'video2-looping';
-            hasInteracted = false;
-            allowNormalInteraction = false;
-            updateStageDisplay('video2-looping');
-        } else if (currentState === 'video5-looping') {
-            currentState = 'video4-looping';
-            hasInteracted = false;
-            allowNormalInteraction = true;
-            updateStageDisplay('video4-looping');
-        }
+  if (e.key === 'ArrowRight') {
+    if (STATE.allowInteraction) {
+      handleInteraction();
+    } else if (STATE.currentState === 'video2-looping') {
+      const text = document.getElementById('stageText');
+      text.onclick?.();
     }
+  } else if (e.key === 'ArrowLeft') {
+    if (STATE.currentState === 'video3-playing') {
+      STATE.currentState = 'video2-looping';
+      STATE.hasInteracted = false;
+      STATE.allowInteraction = false;
+      updateStageDisplay('video2-looping');
+    } else if (STATE.currentState === 'video5-looping') {
+      STATE.currentState = 'video4-looping';
+      STATE.hasInteracted = false;
+      updateStageDisplay('video4-looping');
+    }
+  }
 });
 
-// Detect if device is iOS
-function isIOS() {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-}
+// ===== DEBUG PANEL =====
+const toggleDebugPanel = () => {
+  document.getElementById('debugPanel').classList.toggle('show');
+};
 
-const isIOSDevice = isIOS();
-console.log('Device is iOS:', isIOSDevice);
+const addLog = (message) => {
+  const log = document.getElementById('messageLog');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+};
 
-// iOS autoplay workaround - play all videos on first interaction
-let iosAutoplayInitiated = false;
-function initiateIOSAutoplay() {
-    if (iosAutoplayInitiated) return;
-    iosAutoplayInitiated = true;
-    
-    console.log('First user interaction detected on iOS, unlocking autoplay...');
-    
-    // Try to play all videos to unlock iOS autoplay restriction
-    Object.values(videos).forEach(video => {
-        const playPromise = video.play();
-        if (playPromise) {
-            playPromise
-                .then(() => {
-                    console.log('Video unlocked for autoplay');
-                    video.pause(); // Pause after unlocking
-                })
-                .catch(err => console.log('Unlock attempt:', err));
-        }
-    });
-    
-    // Initialize sequence after unlock
-    setTimeout(() => {
-        console.log('Starting video sequence...');
-        initializeVideoSequence();
-    }, 300);
-}
+const updateStatus = (connected) => {
+  const status = document.getElementById('status');
+  const text = document.getElementById('statusText');
+  
+  if (connected) {
+    status.classList.remove('disconnected');
+    status.classList.add('connected');
+    text.textContent = 'Connected ✓';
+  } else {
+    status.classList.remove('connected');
+    status.classList.add('disconnected');
+    text.textContent = 'Disconnected ✗';
+  }
+};
 
-// Only add interaction listeners for iOS
-if (isIOSDevice) {
-    document.addEventListener('touchstart', initiateIOSAutoplay, { once: true });
-    document.addEventListener('click', initiateIOSAutoplay, { once: true });
-}
+const updateFeedback = (message) => {
+  document.getElementById('feedback').textContent = message;
+};
 
-function toggleDebugPanel() {
-    const debugPanel = document.getElementById('debugPanel');
-    debugPanel.classList.toggle('show');
-}
+// ===== WEBSOCKET MANAGEMENT =====
+const connectWebSocket = () => {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  STATE.ws = new WebSocket(`${protocol}//${window.location.host}`);
 
-function connectWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}`;
-    
-    console.log(`Connecting to: ${wsUrl}`);
-    ws = new WebSocket(wsUrl);
+  STATE.ws.onopen = () => {
+    updateStatus(true);
+    addLog('✅ Connected');
+    STATE.reconnectAttempts = 0;
+  };
 
-    ws.onopen = () => {
-        console.log('WebSocket connected');
-        updateStatus(true);
-        addLog('✅ Connected to server');
-        reconnectAttempts = 0;
-        
-        // Send initial connection message
-        sendMessage({
-            type: 'client_type',
-            value: 'web_interface'
-        });
-    };
-
-    ws.onmessage = (event) => {
-        try {
-            let data;
-            try {
-                data = JSON.parse(event.data);
-            } catch {
-                // If not JSON, treat as plain text
-                data = event.data;
-            }
-            console.log('Received:', data);
-            
-            // Handle both JSON objects and plain text
-            const displayText = typeof data === 'object' ? data.type : data;
-            addLog(`📨 Received: ${displayText}`);
-            
-            // Display feedback from server
-            if (typeof data === 'object' && data.type === 'connection') {
-                updateFeedback('Connected to WebSocket Server');
-            }
-        } catch (error) {
-            console.error('Error parsing message:', error);
-        }
-    };
-
-    ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        addLog('❌ Connection error');
-    };
-
-    ws.onclose = () => {
-        console.log('WebSocket disconnected');
-        updateStatus(false);
-        addLog('⚠️ Disconnected from server');
-        
-        // Attempt reconnection
-        if (reconnectAttempts < maxReconnectAttempts) {
-            reconnectAttempts++;
-            console.log(`Reconnecting in ${reconnectDelay}ms (Attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
-            addLog(`🔄 Reconnecting... (${reconnectAttempts}/${maxReconnectAttempts})`);
-            setTimeout(connectWebSocket, reconnectDelay);
-        }
-    };
-}
-
-function updateStatus(connected) {
-    const statusDiv = document.getElementById('status');
-    const statusText = document.getElementById('statusText');
-    
-    if (connected) {
-        statusDiv.classList.remove('disconnected');
-        statusDiv.classList.add('connected');
-        statusText.textContent = 'Connected ✓';
-    } else {
-        statusDiv.classList.remove('connected');
-        statusDiv.classList.add('disconnected');
-        statusText.textContent = 'Disconnected ✗';
+  STATE.ws.onmessage = (e) => {
+    try {
+      const data = (() => {
+        try { return JSON.parse(e.data); }
+        catch { return e.data; }
+      })();
+      addLog(`📨 ${typeof data === 'object' ? data.type : data}`);
+    } catch (err) {
+      console.error('Message error:', err);
     }
-}
+  };
 
-function sendButton(buttonName) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        // Extract button number (1, 2, or 3)
-        const buttonNumber = buttonName.replace('button', '');
-        
-        sendMessage(buttonNumber);
-        updateFeedback(`Button pressed: ${buttonName}`);
-        
-        // Add pulse animation
-        const mainButton = document.querySelector('.main-button');
-        mainButton.classList.add('pulse');
-        setTimeout(() => {
-            mainButton.classList.remove('pulse');
-        }, 600);
-    } else {
-        updateFeedback('⚠️ Not connected to server');
-        addLog('❌ Cannot send: Not connected');
+  STATE.ws.onerror = () => addLog('❌ Connection error');
+
+  STATE.ws.onclose = () => {
+    updateStatus(false);
+    addLog('⚠️ Disconnected');
+    
+    if (STATE.reconnectAttempts < CONFIG.reconnect.maxAttempts) {
+      STATE.reconnectAttempts++;
+      addLog(`🔄 Reconnecting... (${STATE.reconnectAttempts}/${CONFIG.reconnect.maxAttempts})`);
+      setTimeout(connectWebSocket, CONFIG.reconnect.delayMs);
     }
-}
+  };
+};
 
-function sendMessage(data) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(data.toString());
-        addLog(`📤 Sent: ${data}`);
-        console.log('Sent:', data);
-    }
-}
+const sendMessage = (data) => {
+  if (STATE.ws?.readyState === WebSocket.OPEN) {
+    STATE.ws.send(data.toString());
+    addLog(`📤 Sent: ${data}`);
+  }
+};
 
-function updateFeedback(message) {
-    const feedback = document.getElementById('feedback');
-    feedback.textContent = message;
-}
+const sendButton = (buttonName) => {
+  if (STATE.ws?.readyState === WebSocket.OPEN) {
+    const num = buttonName.replace('button', '');
+    sendMessage(num);
+    updateFeedback(`Button: ${buttonName}`);
+    
+    const btn = document.querySelector('.main-button');
+    btn.classList.add('pulse');
+    setTimeout(() => btn.classList.remove('pulse'), 600);
+  } else {
+    updateFeedback('⚠️ Not connected');
+  }
+};
 
-function addLog(message) {
-    const log = document.getElementById('messageLog');
-    const entry = document.createElement('div');
-    entry.className = 'log-entry';
-    const timestamp = new Date().toLocaleTimeString();
-    entry.textContent = `[${timestamp}] ${message}`;
-    log.appendChild(entry);
-    log.scrollTop = log.scrollHeight;
-}
-
-// Connect on page load
+// ===== INITIALIZATION =====
 window.addEventListener('load', () => {
-    connectWebSocket();
-    
-    // For non-iOS devices, auto-start the video sequence
-    if (!isIOSDevice) {
-        console.log('Android/non-iOS device detected. Auto-starting video sequence...');
-        setTimeout(() => {
-            initializeVideoSequence();
-        }, 500);
-    } else {
-        console.log('iOS device detected. Waiting for user interaction to start video sequence...');
-    }
+  initVideos();
+  connectWebSocket();
+  
+  if (!STATE.isIOS) {
+    setTimeout(initializeVideoSequence, 500);
+  }
 });
 
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-    if (ws) {
-        ws.close();
-    }
-});
+window.addEventListener('beforeunload', () => STATE.ws?.close());
