@@ -17,15 +17,6 @@ const videos = {
 function initializeVideoSequence() {
     console.log('Initializing video sequence...');
     
-    // Force play for iOS compatibility
-    Object.values(videos).forEach(video => {
-        if (video.play()) {
-            video.play().catch(err => {
-                console.log('Video autoplay blocked, waiting for user interaction:', err);
-            });
-        }
-    });
-    
     // Play video 1
     playVideo('video1', () => {
         console.log('Video 1 finished, playing Video 2');
@@ -39,6 +30,7 @@ function playVideo(videoId, onEnded = null, isLooping = false) {
     // Hide all videos
     Object.keys(videos).forEach(id => {
         videos[id].classList.remove('active');
+        videos[id].pause();
     });
     
     const video = videos[videoId];
@@ -53,7 +45,18 @@ function playVideo(videoId, onEnded = null, isLooping = false) {
     }
     
     video.currentTime = 0;
-    video.play().catch(err => console.error('Video play error:', err));
+    
+    // Use promise-based play for better iOS compatibility
+    const playPromise = video.play();
+    if (playPromise !== undefined) {
+        playPromise
+            .then(() => {
+                console.log(`${videoId} is playing`);
+            })
+            .catch(err => {
+                console.error(`Failed to play ${videoId}:`, err);
+            });
+    }
 }
 
 function handleInteraction() {
@@ -95,20 +98,29 @@ function initiateIOSAutoplay() {
     if (iosAutoplayInitiated) return;
     iosAutoplayInitiated = true;
     
-    // Try to play all videos to unlock iOS autoplay
+    console.log('First user interaction detected on iOS, unlocking autoplay...');
+    
+    // Try to play all videos to unlock iOS autoplay restriction
     Object.values(videos).forEach(video => {
         const playPromise = video.play();
         if (playPromise) {
-            playPromise.catch(err => console.log('iOS autoplay attempt:', err));
+            playPromise
+                .then(() => {
+                    console.log('Video unlocked for autoplay');
+                    video.pause(); // Pause after unlocking
+                })
+                .catch(err => console.log('Unlock attempt:', err));
         }
     });
     
-    // Initialize sequence after a small delay
+    // Initialize sequence after unlock
     setTimeout(() => {
+        console.log('Starting video sequence...');
         initializeVideoSequence();
-    }, 100);
+    }, 300);
 }
 
+// Remove old listeners and replace with single unified listener
 document.addEventListener('touchstart', initiateIOSAutoplay, { once: true });
 document.addEventListener('click', initiateIOSAutoplay, { once: true });
 
@@ -242,10 +254,7 @@ function addLog(message) {
 // Connect on page load
 window.addEventListener('load', () => {
     connectWebSocket();
-    // Start video sequence when page loads
-    setTimeout(() => {
-        initializeVideoSequence();
-    }, 500); // Small delay to ensure videos are ready
+    console.log('Page loaded. Waiting for user interaction to start video sequence...');
 });
 
 // Cleanup on page unload
