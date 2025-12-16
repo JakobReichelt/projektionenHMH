@@ -109,6 +109,10 @@ const handleInteraction = () => {
       playVideo('video5', null, true);
       STATE.currentStage = 'video5-looping';
       updateStageDisplay('video5');
+      // Send message when last stage is reached
+      if (STATE.ws?.readyState === WebSocket.OPEN) {
+        STATE.ws.send('1');
+      }
       break;
   }
 };
