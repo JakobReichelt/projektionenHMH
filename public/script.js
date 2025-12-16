@@ -32,6 +32,7 @@ const stageContent = {
 // Video sequence state
 let currentState = 'idle';
 let hasInteracted = false;
+let allowNormalInteraction = true; // Flag to control if regular clicks trigger interaction
 const videos = {
     video1: document.getElementById('video1'),
     video2: document.getElementById('video2'),
@@ -51,21 +52,32 @@ function updateStageDisplay(stageName) {
         if (titleElement) titleElement.textContent = stage.title || '';
         if (textElement) textElement.textContent = stage.text || '';
         
+        // Remove previous styling
+        textElement.classList.remove('interactive', 'black-text');
+        titleElement.classList.remove('black-text');
+        stageDisplay.classList.remove('interactive');
+        textElement.onclick = null;
+        
         // Make video2-looping stage text clickable and send message
         if (stageName === 'video2-looping') {
+            allowNormalInteraction = false; // Disable regular interactions
             stageDisplay.classList.add('interactive');
             textElement.classList.add('interactive');
             textElement.onclick = () => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send('2');
                     console.log('Sent: 2');
+                    allowNormalInteraction = true; // Re-enable for next stage
                     handleInteraction();
                 }
             };
+        } else if (stageName === 'video4-looping') {
+            allowNormalInteraction = true; // Enable regular interactions for 4th stage
+            // Make 4th stage text black
+            titleElement.classList.add('black-text');
+            textElement.classList.add('black-text');
         } else {
-            stageDisplay.classList.remove('interactive');
-            textElement.classList.remove('interactive');
-            textElement.onclick = null;
+            allowNormalInteraction = true; // Enable for other stages
         }
         
         console.log(`Stage updated: ${stageName} - "${stage.title}"`);
@@ -149,10 +161,12 @@ function handleInteraction() {
 }
 
 // Add interaction listeners
-document.addEventListener('touchstart', handleInteraction);
+document.addEventListener('touchstart', () => {
+    if (allowNormalInteraction) handleInteraction();
+});
 document.addEventListener('click', (e) => {
-    // Only trigger on non-button clicks
-    if (!e.target.classList.contains('main-button') && !e.target.classList.contains('debug-toggle')) {
+    // Only trigger on non-button clicks if interaction is allowed
+    if (allowNormalInteraction && !e.target.classList.contains('main-button') && !e.target.classList.contains('debug-toggle') && !e.target.classList.contains('interactive')) {
         handleInteraction();
     }
 });

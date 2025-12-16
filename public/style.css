@@ -77,14 +77,22 @@ body::before {
 
 .stage-display {
     position: fixed;
-    top: 20%;
+    top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
     z-index: 5;
-    max-width: 600px;
+    max-width: 400px;
     padding: 30px;
     pointer-events: none;
+}
+
+.stage-display .stage-title {
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
 }
 
 .stage-display.interactive {
@@ -110,20 +118,21 @@ body::before {
 
 .stage-text.interactive {
     cursor: pointer;
-    padding: 20px 30px;
-    background: rgba(0, 0, 0, 0.6);
-    border: 2px solid white;
-    border-radius: 10px;
     transition: all 0.3s ease;
+    text-decoration: underline;
 }
 
 .stage-text.interactive:hover {
-    background: rgba(0, 0, 0, 0.8);
-    transform: scale(1.05);
+    opacity: 0.8;
 }
 
 .stage-text.interactive:active {
-    transform: scale(0.95);
+    opacity: 0.6;
+}
+
+.black-text {
+    color: black !important;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8) !important;
 }
 
 .debug-toggle {
@@ -261,12 +270,12 @@ body::before {
     }
 
     .stage-display {
-        max-width: 90%;
+        max-width: 85%;
         padding: 20px;
     }
 
     .stage-title {
-        font-size: 2em;
+        font-size: 1.2em;
         margin-bottom: 15px;
     }
 
