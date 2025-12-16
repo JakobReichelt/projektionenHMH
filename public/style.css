@@ -75,6 +75,35 @@ body::before {
     transform: scale(0.95);
 }
 
+.stage-display {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 5;
+    max-width: 600px;
+    padding: 30px;
+    pointer-events: none;
+}
+
+.stage-title {
+    font-size: 3em;
+    font-weight: bold;
+    color: white;
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+    margin-bottom: 20px;
+    letter-spacing: 2px;
+}
+
+.stage-text {
+    font-size: 1.5em;
+    color: white;
+    text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+    line-height: 1.6;
+    font-weight: 300;
+}
+
 .debug-toggle {
     position: fixed;
     bottom: 20px;
@@ -206,6 +235,20 @@ body::before {
     .main-button {
         width: 150px;
         height: 150px;
+        font-size: 1em;
+    }
+
+    .stage-display {
+        max-width: 90%;
+        padding: 20px;
+    }
+
+    .stage-title {
+        font-size: 2em;
+        margin-bottom: 15px;
+    }
+
+    .stage-text {
         font-size: 1em;
     }
 }

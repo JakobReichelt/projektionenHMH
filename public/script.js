@@ -3,6 +3,32 @@ let reconnectAttempts = 0;
 const maxReconnectAttempts = 5;
 const reconnectDelay = 3000;
 
+// ===== STAGE MANAGER CONFIGURATION =====
+// Define content for each stage/video
+const stageContent = {
+    video1: {
+        title: '',
+        text: ''
+    },
+    'video2-looping': {
+        title: 'Willst du auch mal schießen?',
+        text: 'Ja   /    Nein'
+    },
+    video3: {
+        title: '',
+        text: ''
+    },
+    'video4-looping': {
+        title: '↑',
+        text: 'schau hoch'
+    },
+    video5: {
+        title: 'Niki De Saint Phalle schießt auf die Welt',
+        text: 'Ob sie es beim Hannover Schützenfest auch gelernt hat?'
+    }
+};
+// ===== END STAGE MANAGER CONFIGURATION =====
+
 // Video sequence state
 let currentState = 'idle';
 let hasInteracted = false;
@@ -14,6 +40,19 @@ const videos = {
     video5: document.getElementById('video5')
 };
 
+function updateStageDisplay(stageName) {
+    const stage = stageContent[stageName];
+    if (stage) {
+        const titleElement = document.getElementById('stageTitle');
+        const textElement = document.getElementById('stageText');
+        
+        if (titleElement) titleElement.textContent = stage.title;
+        if (textElement) textElement.textContent = stage.text;
+        
+        console.log(`Stage updated: ${stageName} - "${stage.title}"`);
+    }
+}
+
 function initializeVideoSequence() {
     console.log('Initializing video sequence...');
     
@@ -22,8 +61,11 @@ function initializeVideoSequence() {
         console.log('Video 1 finished, playing Video 2');
         playVideo('video2', null, true); // Video 2 loops
         currentState = 'video2-looping';
+        updateStageDisplay('video2-looping');
         hasInteracted = false;
     });
+    
+    updateStageDisplay('video1');
 }
 
 function playVideo(videoId, onEnded = null, isLooping = false) {
@@ -70,16 +112,16 @@ function handleInteraction() {
             console.log('Video 3 finished, playing Video 4');
             playVideo('video4', null, true); // Video 4 loops
             currentState = 'video4-looping';
+            updateStageDisplay('video4-looping');
             hasInteracted = false;
         });
         currentState = 'video3-playing';
+        updateStageDisplay('video3');
     } else if (currentState === 'video4-looping') {
         // Transition from video 4 to video 5
-        playVideo('video5', () => {
-            console.log('Video 5 finished, sequence complete');
-            currentState = 'sequence-complete';
-        });
-        currentState = 'video5-playing';
+        playVideo('video5', null, true); // Video 5 loops indefinitely
+        currentState = 'video5-looping';
+        updateStageDisplay('video5');
     }
 }
 
