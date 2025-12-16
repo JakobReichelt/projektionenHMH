@@ -171,6 +171,36 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Arrow key navigation for testing without videos
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') {
+        console.log('Right arrow pressed - advancing stage');
+        if (allowNormalInteraction) {
+            handleInteraction();
+        } else if (currentState === 'video2-looping') {
+            // For video2, simulate button click
+            const textElement = document.getElementById('stageText');
+            if (textElement && textElement.onclick) {
+                textElement.onclick();
+            }
+        }
+    } else if (e.key === 'ArrowLeft') {
+        console.log('Left arrow pressed - going back');
+        // Simple back functionality
+        if (currentState === 'video3-playing') {
+            currentState = 'video2-looping';
+            hasInteracted = false;
+            allowNormalInteraction = false;
+            updateStageDisplay('video2-looping');
+        } else if (currentState === 'video5-looping') {
+            currentState = 'video4-looping';
+            hasInteracted = false;
+            allowNormalInteraction = true;
+            updateStageDisplay('video4-looping');
+        }
+    }
+});
+
 // Detect if device is iOS
 function isIOS() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
