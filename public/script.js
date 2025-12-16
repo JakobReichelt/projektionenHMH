@@ -42,12 +42,31 @@ const videos = {
 
 function updateStageDisplay(stageName) {
     const stage = stageContent[stageName];
+    const titleElement = document.getElementById('stageTitle');
+    const textElement = document.getElementById('stageText');
+    const stageDisplay = document.querySelector('.stage-display');
+    
     if (stage) {
-        const titleElement = document.getElementById('stageTitle');
-        const textElement = document.getElementById('stageText');
+        // Set text content (or empty string)
+        if (titleElement) titleElement.textContent = stage.title || '';
+        if (textElement) textElement.textContent = stage.text || '';
         
-        if (titleElement) titleElement.textContent = stage.title;
-        if (textElement) textElement.textContent = stage.text;
+        // Make video2-looping stage text clickable and send message
+        if (stageName === 'video2-looping') {
+            stageDisplay.classList.add('interactive');
+            textElement.classList.add('interactive');
+            textElement.onclick = () => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send('2');
+                    console.log('Sent: 2');
+                    handleInteraction();
+                }
+            };
+        } else {
+            stageDisplay.classList.remove('interactive');
+            textElement.classList.remove('interactive');
+            textElement.onclick = null;
+        }
         
         console.log(`Stage updated: ${stageName} - "${stage.title}"`);
     }
@@ -55,6 +74,12 @@ function updateStageDisplay(stageName) {
 
 function initializeVideoSequence() {
     console.log('Initializing video sequence...');
+    
+    // Clear initial stage display
+    const titleElement = document.getElementById('stageTitle');
+    const textElement = document.getElementById('stageText');
+    if (titleElement) titleElement.textContent = '';
+    if (textElement) textElement.textContent = '';
     
     // Play video 1
     playVideo('video1', () => {
@@ -64,8 +89,6 @@ function initializeVideoSequence() {
         updateStageDisplay('video2-looping');
         hasInteracted = false;
     });
-    
-    updateStageDisplay('video1');
 }
 
 function playVideo(videoId, onEnded = null, isLooping = false) {
