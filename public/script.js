@@ -125,29 +125,6 @@ document.addEventListener('click', (e) => {
   if (STATE.allowInteraction && !isButton) handleInteraction();
 });
 
-// Keyboard navigation
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowRight') {
-    if (STATE.allowInteraction) {
-      handleInteraction();
-    } else if (STATE.currentStage === 'video2-looping') {
-      const text = document.getElementById('stageText');
-      text.onclick?.();
-    }
-  } else if (e.key === 'ArrowLeft') {
-    if (STATE.currentStage === 'video3-playing') {
-      STATE.currentStage = 'video2-looping';
-      STATE.hasInteracted = false;
-      STATE.allowInteraction = false;
-      updateStageDisplay('video2-looping');
-    } else if (STATE.currentStage === 'video5-looping') {
-      STATE.currentStage = 'video4-looping';
-      STATE.hasInteracted = false;
-      updateStageDisplay('video4-looping');
-    }
-  }
-});
-
 // ===== DEBUG PANEL =====
 const toggleDebugPanel = () => {
   document.getElementById('debugPanel').classList.toggle('show');
