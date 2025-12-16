@@ -22,7 +22,7 @@ wss.on('connection', (ws) => {
   clients.add(ws);
 
   // Send simple welcome message
-  ws.send('CONNECTED');
+  ws.send(JSON.stringify({ type: 'connection', message: 'Connected to server' }));
 
   // Handle incoming messages from clients
   ws.on('message', (message) => {
@@ -31,10 +31,10 @@ wss.on('connection', (ws) => {
       let messageStr = message.toString().trim();
       console.log('Received:', messageStr);
       
-      // Broadcast raw message to all connected clients
+      // Broadcast message to all connected clients as JSON
       wss.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
-          client.send(messageStr);
+          client.send(JSON.stringify({ type: 'message', data: messageStr }));
         }
       });
     } catch (error) {

@@ -30,12 +30,21 @@ function connectWebSocket() {
 
     ws.onmessage = (event) => {
         try {
-            const data = JSON.parse(event.data);
+            let data;
+            try {
+                data = JSON.parse(event.data);
+            } catch {
+                // If not JSON, treat as plain text
+                data = event.data;
+            }
             console.log('Received:', data);
-            addLog(`📨 Received: ${data.type}`);
+            
+            // Handle both JSON objects and plain text
+            const displayText = typeof data === 'object' ? data.type : data;
+            addLog(`📨 Received: ${displayText}`);
             
             // Display feedback from server
-            if (data.type === 'connection') {
+            if (typeof data === 'object' && data.type === 'connection') {
                 updateFeedback('Connected to WebSocket Server');
             }
         } catch (error) {
