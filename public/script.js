@@ -17,6 +17,15 @@ const videos = {
 function initializeVideoSequence() {
     console.log('Initializing video sequence...');
     
+    // Force play for iOS compatibility
+    Object.values(videos).forEach(video => {
+        if (video.play()) {
+            video.play().catch(err => {
+                console.log('Video autoplay blocked, waiting for user interaction:', err);
+            });
+        }
+    });
+    
     // Play video 1
     playVideo('video1', () => {
         console.log('Video 1 finished, playing Video 2');
@@ -79,6 +88,29 @@ document.addEventListener('click', (e) => {
         handleInteraction();
     }
 });
+
+// iOS autoplay workaround - play all videos on first interaction
+let iosAutoplayInitiated = false;
+function initiateIOSAutoplay() {
+    if (iosAutoplayInitiated) return;
+    iosAutoplayInitiated = true;
+    
+    // Try to play all videos to unlock iOS autoplay
+    Object.values(videos).forEach(video => {
+        const playPromise = video.play();
+        if (playPromise) {
+            playPromise.catch(err => console.log('iOS autoplay attempt:', err));
+        }
+    });
+    
+    // Initialize sequence after a small delay
+    setTimeout(() => {
+        initializeVideoSequence();
+    }, 100);
+}
+
+document.addEventListener('touchstart', initiateIOSAutoplay, { once: true });
+document.addEventListener('click', initiateIOSAutoplay, { once: true });
 
 function toggleDebugPanel() {
     const debugPanel = document.getElementById('debugPanel');
