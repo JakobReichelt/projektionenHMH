@@ -92,6 +92,14 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Detect if device is iOS
+function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+const isIOSDevice = isIOS();
+console.log('Device is iOS:', isIOSDevice);
+
 // iOS autoplay workaround - play all videos on first interaction
 let iosAutoplayInitiated = false;
 function initiateIOSAutoplay() {
@@ -120,9 +128,11 @@ function initiateIOSAutoplay() {
     }, 300);
 }
 
-// Remove old listeners and replace with single unified listener
-document.addEventListener('touchstart', initiateIOSAutoplay, { once: true });
-document.addEventListener('click', initiateIOSAutoplay, { once: true });
+// Only add interaction listeners for iOS
+if (isIOSDevice) {
+    document.addEventListener('touchstart', initiateIOSAutoplay, { once: true });
+    document.addEventListener('click', initiateIOSAutoplay, { once: true });
+}
 
 function toggleDebugPanel() {
     const debugPanel = document.getElementById('debugPanel');
@@ -254,7 +264,16 @@ function addLog(message) {
 // Connect on page load
 window.addEventListener('load', () => {
     connectWebSocket();
-    console.log('Page loaded. Waiting for user interaction to start video sequence...');
+    
+    // For non-iOS devices, auto-start the video sequence
+    if (!isIOSDevice) {
+        console.log('Android/non-iOS device detected. Auto-starting video sequence...');
+        setTimeout(() => {
+            initializeVideoSequence();
+        }, 500);
+    } else {
+        console.log('iOS device detected. Waiting for user interaction to start video sequence...');
+    }
 });
 
 // Cleanup on page unload
