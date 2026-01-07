@@ -20,8 +20,9 @@ body {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
+    width: 100vw;
     height: 100vh;
+    height: 100dvh;
     z-index: -1;
     display: flex;
     justify-content: center;
@@ -229,6 +230,18 @@ body {
 
 /* ===== RESPONSIVE DESIGN ===== */
 @media (max-width: 667px) {
+    .video-container {
+        height: 100vh;
+        height: 100dvh;
+    }
+
+    .background-video {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        object-fit: fill;
+    }
+
     .debug-toggle {
         bottom: 15px;
         left: 15px;
