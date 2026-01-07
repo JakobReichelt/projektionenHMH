@@ -7,7 +7,8 @@ const STATE = {
   reconnectAttempts: 0,
   iosInitiated: false,
   videos: {},
-  isIOS: CONFIG.isIOS()
+  isIOS: CONFIG.isIOS(),
+  loop6TimeoutId: null
 };
 
 // Cache video elements on load
@@ -17,38 +18,35 @@ const initVideos = () => {
     video2: document.getElementById('video2'),
     video3: document.getElementById('video3'),
     video4: document.getElementById('video4'),
-    video5: document.getElementById('video5')
+    video5: document.getElementById('video5'),
+    video6: document.getElementById('video6'),
+    video7: document.getElementById('video7')
   };
 };
 
 // ===== STAGE DISPLAY =====
 const updateStageDisplay = (stageId) => {
   const stage = CONFIG.getStage(stageId);
-  if (!stage) return;
-
   const title = document.getElementById('stageTitle');
   const text = document.getElementById('stageText');
   const display = document.querySelector('.stage-display');
 
-  title.textContent = stage.title || '';
-  text.textContent = stage.text || '';
+  title.textContent = stage?.title || '';
+  text.textContent = stage?.text || '';
   text.classList.remove('interactive', 'black-text');
   title.classList.remove('black-text');
   display.classList.remove('interactive');
   text.onclick = null;
 
   // Special handling for interactive stages
-  if (stageId === 'video2-looping') {
-    STATE.allowInteraction = false;
+  if (stageId === 'video3-looping') {
+    STATE.allowInteraction = true;
     display.classList.add('interactive');
     text.classList.add('interactive');
     text.onclick = () => {
-      if (STATE.ws?.readyState === WebSocket.OPEN) {
-        STATE.ws.send('2');
-      }
       handleInteraction();
     };
-  } else if (stageId === 'video4-looping') {
+  } else if (stageId === 'video4') {
     STATE.allowInteraction = true;
     title.classList.add('black-text');
     text.classList.add('black-text');
@@ -61,6 +59,11 @@ const updateStageDisplay = (stageId) => {
 
 // ===== VIDEO PLAYBACK =====
 const playVideo = (videoId, onEnded = null, isLooping = false) => {
+  if (STATE.loop6TimeoutId) {
+    clearTimeout(STATE.loop6TimeoutId);
+    STATE.loop6TimeoutId = null;
+  }
+
   Object.values(STATE.videos).forEach(v => {
     v.classList.remove('active');
     v.pause();
@@ -79,13 +82,38 @@ const playVideo = (videoId, onEnded = null, isLooping = false) => {
 const initializeVideoSequence = () => {
   document.getElementById('stageTitle').textContent = '';
   document.getElementById('stageText').textContent = '';
-  
+
+  // 1 -> 2 -> loop 3 (wait interaction) -> 4 -> 5 -> loop 6 for 3s -> 7
   playVideo('video1', () => {
-    playVideo('video2', null, true);
-    STATE.currentStage = 'video2-looping';
-    updateStageDisplay('video2-looping');
-    STATE.hasInteracted = false;
-  });
+    STATE.currentStage = 'video2';
+    updateStageDisplay('video2');
+
+    playVideo('video2', () => {
+      playVideo('video3', null, true);
+      STATE.currentStage = 'video3-looping';
+      updateStageDisplay('video3-looping');
+      STATE.hasInteracted = false;
+    }, false);
+  }, false);
+};
+
+const startTimedLoop6Then7 = (ms) => {
+  playVideo('video6', null, true);
+  STATE.currentStage = 'video6-looping';
+  updateStageDisplay('video6-looping');
+  STATE.allowInteraction = false;
+
+  STATE.loop6TimeoutId = setTimeout(() => {
+    STATE.loop6TimeoutId = null;
+    STATE.currentStage = 'video7';
+    updateStageDisplay('video7');
+    playVideo('video7', null, false);
+
+    // Send message when last stage is reached
+    if (STATE.ws?.readyState === WebSocket.OPEN) {
+      STATE.ws.send('1');
+    }
+  }, ms);
 };
 
 // ===== INTERACTION HANDLING =====
@@ -94,25 +122,19 @@ const handleInteraction = () => {
   STATE.hasInteracted = true;
 
   switch (STATE.currentStage) {
-    case 'video2-looping':
-      playVideo('video3', () => {
-        playVideo('video4', null, true);
-        STATE.currentStage = 'video4-looping';
-        updateStageDisplay('video4-looping');
-        STATE.hasInteracted = false;
-      });
-      STATE.currentStage = 'video3-playing';
-      updateStageDisplay('video3');
-      break;
-
-    case 'video4-looping':
-      playVideo('video5', null, true);
-      STATE.currentStage = 'video5-looping';
-      updateStageDisplay('video5');
-      // Send message when last stage is reached
+    case 'video3-looping':
       if (STATE.ws?.readyState === WebSocket.OPEN) {
-        STATE.ws.send('1');
+        STATE.ws.send('2');
       }
+
+      // Interaction during looping 3 triggers 4 -> 5 -> loop 6 for 3s -> 7
+      STATE.currentStage = 'video4';
+      updateStageDisplay('video4');
+      playVideo('video4', () => {
+        STATE.currentStage = 'video5';
+        updateStageDisplay('video5');
+        playVideo('video5', () => startTimedLoop6Then7(3000), false);
+      }, false);
       break;
   }
 };

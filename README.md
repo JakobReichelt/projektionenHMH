@@ -4,10 +4,10 @@ This server serves the website from `public/` and selects the background videos 
 
 ## How it works
 
-- The client requests videos as `/1.mp4` … `/5.mp4`.
+- The client requests videos as `/1.mp4` … `/7.mp4`.
 - The server looks at the request host (e.g. `leibniz.example.com`).
 - If the subdomain matches a folder inside `assets/` (case-insensitive), videos are served from that folder:
-  - `leibniz.*` → `assets/LEIBNIZ/1.mp4` … `assets/LEIBNIZ/5.mp4`
+   - `leibniz.*` → `assets/LEIBNIZ/1.mp4` … `assets/LEIBNIZ/7.mp4`
   - `niki.*` → `assets/NIKI/...`
   - `pferde.*` → `assets/PFERDE/...`
 

@@ -79,7 +79,7 @@ app.use(express.static('public'));
 
 // Serve background videos based on subdomain.
 // Requests like /1.mp4 are mapped to assets/<SUBDOMAIN>/1.mp4 when such a folder exists.
-app.get(/^\/(?:[1-5])\.mp4$/, (req, res, next) => {
+app.get(/^\/(?:[1-7])\.mp4$/, (req, res, next) => {
   const subdomainKey = getSubdomainKeyFromHost(req.headers.host);
   const requestedFile = req.path.slice(1);
 
