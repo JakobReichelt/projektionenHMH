@@ -5,12 +5,12 @@ const CONFIG = {
   // Stage content configuration
   stages: [
     { id: 'video1', title: '', text: '' },
-    { id: 'video2', title: '', text: '' },
+    { id: 'video2', title: 'Willst du auch mal schießen?', text: 'Ja   /    Nein' },
     { id: 'video3-looping', title: 'Willst du auch mal schießen?', text: 'Ja   /    Nein' },
-    { id: 'video4', title: '↑', text: 'schau hoch' },
-    { id: 'video5', title: 'Niki De Saint Phalle schießt auf die Welt', text: 'Ob sie es beim Hannover Schützenfest auch gelernt hat?' },
-    { id: 'video6-looping', title: '', text: '' },
-    { id: 'video7', title: '', text: '' }
+    { id: 'video4', title: '', text: '' },
+    { id: 'video5', title: '', text: '' },
+    { id: 'video6-looping', title: '↑', text: 'schau hoch' },
+    { id: 'video7', title: 'Niki De Saint Phalle schießt auf die Welt', text: 'Ob sie es beim Hannover Schützenfest auch gelernt hat?' }
   ],
 
   // WebSocket configuration

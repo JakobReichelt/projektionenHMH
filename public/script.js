@@ -46,8 +46,8 @@ const updateStageDisplay = (stageId) => {
     text.onclick = () => {
       handleInteraction();
     };
-  } else if (stageId === 'video4') {
-    STATE.allowInteraction = true;
+  } else if (stageId === 'video6-looping') {
+    STATE.allowInteraction = false;
     title.classList.add('black-text');
     text.classList.add('black-text');
   } else {
