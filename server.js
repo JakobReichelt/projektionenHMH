@@ -11,7 +11,6 @@ const PORT = process.env.PORT || 8080;
 
 const SHOW_QUERY_PARAM = 'show';
 const SHOW_COOKIE_NAME = 'show';
-
 const ASSETS_DIR = path.join(__dirname, 'assets');
 
 const getAssetSubfolderMap = () => {
