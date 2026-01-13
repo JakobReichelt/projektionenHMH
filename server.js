@@ -9,6 +9,9 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 const PORT = process.env.PORT || 8080;
 
+const SHOW_QUERY_PARAM = 'show';
+const SHOW_COOKIE_NAME = 'show';
+
 const ASSETS_DIR = path.join(__dirname, 'assets');
 
 const getAssetSubfolderMap = () => {
@@ -73,22 +76,92 @@ const getSubdomainKeyFromHost = (hostHeader) => {
   return parts[0] || null;
 };
 
+const parseCookieHeader = (cookieHeader) => {
+  const result = {};
+  if (!cookieHeader || typeof cookieHeader !== 'string') return result;
+
+  const pairs = cookieHeader.split(';');
+  for (const pair of pairs) {
+    const idx = pair.indexOf('=');
+    if (idx <= 0) continue;
+    const key = pair.slice(0, idx).trim();
+    const value = pair.slice(idx + 1).trim();
+    if (!key) continue;
+    try {
+      result[key] = decodeURIComponent(value);
+    } catch {
+      result[key] = value;
+    }
+  }
+  return result;
+};
+
+const resolveAssetsFolder = (rawKey) => {
+  const key = (rawKey || '').toString().trim().toLowerCase();
+  if (!key) return null;
+
+  const mapped = ASSET_SUBFOLDERS.get(key);
+  if (mapped) return mapped;
+
+  // Allow specifying the real folder name as well
+  for (const folderName of ASSET_SUBFOLDERS.values()) {
+    if (folderName.toLowerCase() === key) return folderName;
+  }
+
+  return null;
+};
+
+const getRequestedAssetsFolder = (req) => {
+  // Priority: explicit query parameter > cookie > subdomain
+  const queryKey = req?.query?.[SHOW_QUERY_PARAM];
+  const fromQuery = queryKey !== undefined ? resolveAssetsFolder(queryKey) : null;
+  if (fromQuery) return fromQuery;
+
+  const cookies = parseCookieHeader(req?.headers?.cookie);
+  const fromCookie = resolveAssetsFolder(cookies[SHOW_COOKIE_NAME]);
+  if (fromCookie) return fromCookie;
+
+  const subdomainKey = getSubdomainKeyFromHost(req?.headers?.host);
+  const fromSubdomain = resolveAssetsFolder(subdomainKey);
+  if (fromSubdomain) return fromSubdomain;
+
+  return null;
+};
+
 // Middleware
 app.use(express.json());
+
+// Persist ?show=<assets-folder> selection via cookie so the static page can load
+// /1.mp4 ... /7.mp4 without needing to append query parameters on every request.
+app.use((req, res, next) => {
+  const showParam = req?.query?.[SHOW_QUERY_PARAM];
+  if (showParam !== undefined) {
+    const normalized = (showParam || '').toString().trim();
+    if (!normalized) {
+      res.clearCookie(SHOW_COOKIE_NAME);
+    } else {
+      const folderName = resolveAssetsFolder(normalized);
+      if (folderName) {
+        res.cookie(SHOW_COOKIE_NAME, folderName, {
+          maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+          sameSite: 'lax'
+        });
+      }
+    }
+  }
+  next();
+});
 app.use(express.static('public'));
 
 // Serve background videos based on subdomain.
 // Requests like /1.mp4 are mapped to assets/<SUBDOMAIN>/1.mp4 when such a folder exists.
 app.get(/^\/(?:[1-7])\.mp4$/, (req, res, next) => {
-  const subdomainKey = getSubdomainKeyFromHost(req.headers.host);
   const requestedFile = req.path.slice(1);
 
   const candidateFolders = [];
 
-  if (subdomainKey) {
-    const folderName = ASSET_SUBFOLDERS.get(subdomainKey);
-    if (folderName) candidateFolders.push(folderName);
-  }
+  const requestedFolder = getRequestedAssetsFolder(req);
+  if (requestedFolder) candidateFolders.push(requestedFolder);
 
   if (DEFAULT_ASSETS_FOLDER && !candidateFolders.includes(DEFAULT_ASSETS_FOLDER)) {
     candidateFolders.push(DEFAULT_ASSETS_FOLDER);
@@ -97,6 +170,9 @@ app.get(/^\/(?:[1-7])\.mp4$/, (req, res, next) => {
   for (const folderName of candidateFolders) {
     const filePath = path.join(ASSETS_DIR, folderName, requestedFile);
     if (fs.existsSync(filePath)) {
+      // This response varies by both Host (subdomain) and Cookie (show selection).
+      res.append('Vary', 'Host');
+      res.append('Vary', 'Cookie');
       return res.sendFile(filePath);
     }
   }

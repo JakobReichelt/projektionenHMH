@@ -2,6 +2,8 @@
 
 This server serves the website from `public/` and selects the background videos based on the request **subdomain**.
 
+It can also select the video set via a QR-code friendly query parameter: `?show=...`.
+
 ## How it works
 
 - The client requests videos as `/1.mp4` … `/7.mp4`.
@@ -12,6 +14,22 @@ This server serves the website from `public/` and selects the background videos 
   - `pferde.*` → `assets/PFERDE/...`
 
 If the host has no subdomain (or doesn’t match a folder), the server falls back to the normal static file handling.
+
+## QR codes / Railway hosting (recommended): `?show=`
+
+When a user opens a link like:
+
+- `https://<your-app-domain>/?show=niki`
+- `https://<your-app-domain>/?show=leibniz`
+
+the server stores that selection in a cookie (`show=<FOLDER>`). That way the page can keep requesting videos as `/1.mp4` … `/7.mp4` and the server still knows which `assets/<FOLDER>/` to use.
+
+Selection priority when serving `/1.mp4`…`/7.mp4`:
+
+1. `?show=<key>` on the video request (if present)
+2. Cookie `show=<key>`
+3. Subdomain (e.g. `niki.example.com`)
+4. Fallback default folder
 
 ## Local testing (Windows)
 
@@ -30,3 +48,10 @@ If the host has no subdomain (or doesn’t match a folder), the server falls bac
    - `http://pferde.localhost:8080/`
 
 Each should load `/1.mp4`… from its matching `assets/<FOLDER>/`.
+
+### Local testing with `?show=`
+
+- `http://localhost:8080/?show=niki`
+- `http://localhost:8080/?show=leibniz`
+
+Tip: `?show=` (empty) clears the cookie.
