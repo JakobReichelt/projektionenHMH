@@ -55,3 +55,4 @@ Each should load `/1.mp4`… from its matching `assets/<FOLDER>/`.
 - `http://localhost:8080/?show=leibniz`
 
 Tip: `?show=` (empty) clears the cookie.
+
