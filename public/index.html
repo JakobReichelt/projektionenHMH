@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TouchDesigner WebSocket Control</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="video-container">
+        <video class="background-video" id="video1" playsinline webkit-playsinline muted autoplay>
+            <source src="/1.mp4" type="video/mp4">
+        </video>
+        <video class="background-video" id="video2" playsinline webkit-playsinline muted loop>
+            <source src="/2.mp4" type="video/mp4">
+        </video>
+        <video class="background-video" id="video3" playsinline webkit-playsinline muted>
+            <source src="/3.mp4" type="video/mp4">
+        </video>
+        <video class="background-video" id="video4" playsinline webkit-playsinline muted loop>
+            <source src="/4.mp4" type="video/mp4">
+        </video>
+        <video class="background-video" id="video5" playsinline webkit-playsinline muted>
+            <source src="/5.mp4" type="video/mp4">
+        </video>
+        <video class="background-video" id="video6" playsinline webkit-playsinline muted loop>
+            <source src="/6.mp4" type="video/mp4">
+        </video>
+        <video class="background-video" id="video7" playsinline webkit-playsinline muted>
+            <source src="/7.mp4" type="video/mp4">
+        </video>
+    </div>
+
+    <div class="stage-title" id="stageTitle"></div>
+    
+    <div class="stage-display">
+        <div class="stage-text" id="stageText"></div>
+    </div>
+
+    <button class="debug-toggle" onclick="toggleDebugPanel()">🔧</button>
+
+    <div class="debug-panel" id="debugPanel">
+        <div class="debug-panel-title">Debug Menu</div>
+        
+        <div class="status disconnected" id="status">
+            Status: <span id="statusText">Disconnected</span>
+        </div>
+
+        <div class="feedback" id="feedback">
+            Waiting for input...
+        </div>
+
+        <div class="message-log" id="messageLog">
+            <div class="log-entry">Initializing connection...</div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
