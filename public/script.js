@@ -108,11 +108,6 @@ const startTimedLoop6Then7 = (ms) => {
     STATE.currentStage = 'video7';
     updateStageDisplay('video7');
     playVideo('video7', null, false);
-
-    // Send message when last stage is reached
-    if (STATE.ws?.readyState === WebSocket.OPEN) {
-      STATE.ws.send('1');
-    }
   }, ms);
 };
 
@@ -193,6 +188,8 @@ const connectWebSocket = () => {
     updateStatus(true);
     addLog('✅ Connected');
     STATE.reconnectAttempts = 0;
+    // Send 1 when site loads
+    STATE.ws.send('1');
   };
 
   STATE.ws.onmessage = (e) => {
