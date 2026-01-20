@@ -92,37 +92,138 @@ const ensureVideoSourceLoaded = (videoId) => {
 const preloadVideoSource = (videoId) => {
   try {
     ensureVideoSourceLoaded(videoId);
+    const video = STATE.videos[videoId];
+    if (!video) return;
+    // Encourage buffering for the *next* clip without pulling everything.
+    video.preload = 'auto';
+    if (STATE.activeVideoId !== videoId) {
+      // Avoid interrupting currently playing video.
+      video.load();
+    }
   } catch {
     // no-op
   }
 };
 
-const playVideo = (videoId, onEnded = null, isLooping = false) => {
+const waitForVideoReady = (video, minReadyState = 3, timeoutMs = 4000) => {
+  if (!video) return Promise.resolve(false);
+  if (video.readyState >= minReadyState) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const startedAt = performance.now();
+
+    const done = (result) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const check = () => {
+      if (video.readyState >= minReadyState) {
+        done(true);
+      }
+    };
+
+    const onError = () => done(false);
+    const onCanPlay = () => check();
+    const onLoadedData = () => check();
+    const onProgress = () => check();
+
+    const cleanup = () => {
+      clearInterval(intervalId);
+      clearTimeout(timeoutId);
+      video.removeEventListener('error', onError);
+      video.removeEventListener('canplay', onCanPlay);
+      video.removeEventListener('loadeddata', onLoadedData);
+      video.removeEventListener('progress', onProgress);
+    };
+
+    video.addEventListener('error', onError);
+    video.addEventListener('canplay', onCanPlay);
+    video.addEventListener('loadeddata', onLoadedData);
+    video.addEventListener('progress', onProgress);
+
+    const intervalId = setInterval(() => {
+      check();
+      if (performance.now() - startedAt > timeoutMs) {
+        done(video.readyState >= minReadyState);
+      }
+    }, 150);
+
+    const timeoutId = setTimeout(() => {
+      done(video.readyState >= minReadyState);
+    }, timeoutMs);
+  });
+};
+
+const transitionToVideo = async (videoId, onEnded = null, isLooping = false, options = {}) => {
+  const {
+    minReadyState = 3,
+    timeoutMs = 4000,
+    logWait = true
+  } = options;
+
   if (STATE.loop6TimeoutId) {
     clearTimeout(STATE.loop6TimeoutId);
     STATE.loop6TimeoutId = null;
   }
 
-  // Load just-in-time to avoid downloading all MP4s at once.
+  const prevId = STATE.activeVideoId;
+  const prevVideo = prevId ? STATE.videos[prevId] : null;
+
+  // Freeze current frame while the next clip buffers.
+  if (prevVideo && prevId !== videoId) {
+    prevVideo.pause();
+  }
+
   ensureVideoSourceLoaded(videoId);
+  const nextVideo = STATE.videos[videoId];
+  if (!nextVideo) return;
 
+  nextVideo.preload = 'auto';
+  nextVideo.loop = isLooping;
+  nextVideo.onended = onEnded;
+  try {
+    nextVideo.currentTime = 0;
+  } catch {
+    // ignore
+  }
+
+  if (logWait) addLog(`⏳ Preparing: ${videoId}`);
+  const ready = await waitForVideoReady(nextVideo, minReadyState, timeoutMs);
+  if (!ready) addLog(`⚠️ Not buffered yet: ${videoId} (ready=${nextVideo.readyState})`);
+
+  // Show the new video only once it has enough buffered data to render.
   Object.values(STATE.videos).forEach(v => {
-    v.classList.remove('active');
-    v.pause();
+    if (v !== prevVideo) v.classList.remove('active');
   });
-
-  const video = STATE.videos[videoId];
-  video.classList.add('active');
-  video.loop = isLooping;
-  video.onended = onEnded;
-  video.currentTime = 0;
+  nextVideo.classList.add('active');
 
   STATE.activeVideoId = videoId;
   startVideoFpsMonitor();
   updateDebugMetrics();
 
-  (video.play() || Promise.resolve())
-    .catch(err => console.error(`Failed to play ${videoId}:`, err));
+  try {
+    await (nextVideo.play() || Promise.resolve());
+  } catch (err) {
+    console.error(`Failed to play ${videoId}:`, err);
+    addLog(`❌ Play failed: ${videoId}`);
+  }
+
+  // Once the new video is active, fully hide/pause others.
+  Object.values(STATE.videos).forEach(v => {
+    if (v !== nextVideo) {
+      v.classList.remove('active');
+      v.pause();
+    }
+  });
+};
+
+const playVideo = (videoId, onEnded = null, isLooping = false) => {
+  // Legacy hard switch. Prefer transitionToVideo() for clean buffered transitions.
+  transitionToVideo(videoId, onEnded, isLooping, { minReadyState: 2, timeoutMs: 1500, logWait: false });
 };
 
 const initializeVideoSequence = () => {
@@ -134,15 +235,15 @@ const initializeVideoSequence = () => {
   preloadVideoSource('video2');
 
   // 1 -> 2 -> loop 3 (wait interaction) -> 4 -> 5 -> loop 6 for 3s -> 7
-  playVideo('video1', () => {
+  transitionToVideo('video1', () => {
     STATE.currentStage = 'video2';
     updateStageDisplay('video2');
 
     preloadVideoSource('video3');
 
-    playVideo('video2', () => {
+    transitionToVideo('video2', () => {
       preloadVideoSource('video4');
-      playVideo('video3', null, true);
+      transitionToVideo('video3', null, true);
       STATE.currentStage = 'video3-looping';
       updateStageDisplay('video3-looping');
       STATE.hasInteracted = false;
@@ -153,7 +254,7 @@ const initializeVideoSequence = () => {
 const startTimedLoop6Then7 = (ms) => {
   preloadVideoSource('video6');
   preloadVideoSource('video7');
-  playVideo('video6', null, true);
+  transitionToVideo('video6', null, true);
   STATE.currentStage = 'video6-looping';
   updateStageDisplay('video6-looping');
   STATE.allowInteraction = false;
@@ -162,7 +263,7 @@ const startTimedLoop6Then7 = (ms) => {
     STATE.loop6TimeoutId = null;
     STATE.currentStage = 'video7';
     updateStageDisplay('video7');
-    playVideo('video7', null, false);
+    transitionToVideo('video7', null, false);
   }, ms);
 };
 
@@ -187,10 +288,10 @@ const handleInteraction = () => {
       STATE.currentStage = 'video4';
       updateStageDisplay('video4');
       preloadVideoSource('video5');
-      playVideo('video4', () => {
+      transitionToVideo('video4', () => {
         STATE.currentStage = 'video5';
         updateStageDisplay('video5');
-        playVideo('video5', () => startTimedLoop6Then7(3000), false);
+        transitionToVideo('video5', () => startTimedLoop6Then7(3000), false, { minReadyState: 3, timeoutMs: 6000 });
       }, false);
       break;
   }
