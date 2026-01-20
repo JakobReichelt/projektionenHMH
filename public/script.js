@@ -11,8 +11,14 @@ const STATE = {
   loop6TimeoutId: null,
   activeVideoId: null,
   debug: {
-    fps: null,
-    rafId: null
+    uiFps: null,
+    rafId: null,
+    videoFps: null,
+    dropsPerSec: null,
+    videoMonitorToken: 0,
+    lastDecodedFrames: null,
+    lastDroppedFrames: null,
+    lastFrameSampleTs: null
   }
 };
 
@@ -112,6 +118,7 @@ const playVideo = (videoId, onEnded = null, isLooping = false) => {
   video.currentTime = 0;
 
   STATE.activeVideoId = videoId;
+  startVideoFpsMonitor();
   updateDebugMetrics();
 
   (video.play() || Promise.resolve())
@@ -264,20 +271,47 @@ const getFrameStats = (video) => {
   return '-';
 };
 
+const getFrameCounters = (video) => {
+  if (!video) return null;
+  try {
+    if (typeof video.getVideoPlaybackQuality === 'function') {
+      const q = video.getVideoPlaybackQuality();
+      const dropped = q.droppedVideoFrames ?? q.droppedVideoFrameCount;
+      const total = q.totalVideoFrames ?? q.totalVideoFrameCount;
+      if (typeof total === 'number') {
+        return { decoded: total, dropped: typeof dropped === 'number' ? dropped : null };
+      }
+    }
+
+    const decoded = video.webkitDecodedFrameCount;
+    const dropped = video.webkitDroppedFrameCount;
+    if (typeof decoded === 'number') {
+      return { decoded, dropped: typeof dropped === 'number' ? dropped : null };
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
 const updateDebugMetrics = () => {
   const stageEl = document.getElementById('debugStage');
   const videoEl = document.getElementById('debugVideo');
-  const fpsEl = document.getElementById('debugFps');
+  const uiFpsEl = document.getElementById('debugUiFps');
+  const videoFpsEl = document.getElementById('debugVideoFps');
+  const dropsEl = document.getElementById('debugDropsPerSec');
   const statesEl = document.getElementById('debugStates');
   const framesEl = document.getElementById('debugFrames');
 
-  if (!stageEl || !videoEl || !fpsEl || !statesEl || !framesEl) return;
+  if (!stageEl || !videoEl || !uiFpsEl || !videoFpsEl || !dropsEl || !statesEl || !framesEl) return;
 
   const activeVideo = getActiveVideo();
 
   stageEl.textContent = STATE.currentStage || '-';
   videoEl.textContent = STATE.activeVideoId || '-';
-  fpsEl.textContent = STATE.debug.fps ? `${STATE.debug.fps.toFixed(0)}` : '-';
+  uiFpsEl.textContent = STATE.debug.uiFps ? `${STATE.debug.uiFps.toFixed(0)}` : '-';
+  videoFpsEl.textContent = STATE.debug.videoFps ? `${STATE.debug.videoFps.toFixed(1)}` : '-';
+  dropsEl.textContent = typeof STATE.debug.dropsPerSec === 'number' ? `${STATE.debug.dropsPerSec.toFixed(1)}` : '-';
   statesEl.textContent = formatVideoState(activeVideo);
   framesEl.textContent = getFrameStats(activeVideo);
 };
@@ -291,7 +325,7 @@ const startFpsMonitor = () => {
     frames += 1;
     const elapsed = now - lastReport;
     if (elapsed >= 1000) {
-      STATE.debug.fps = (frames * 1000) / elapsed;
+      STATE.debug.uiFps = (frames * 1000) / elapsed;
       frames = 0;
       lastReport = now;
       updateDebugMetrics();
@@ -302,6 +336,107 @@ const startFpsMonitor = () => {
 
   if (STATE.debug.rafId) cancelAnimationFrame(STATE.debug.rafId);
   STATE.debug.rafId = requestAnimationFrame(tick);
+};
+
+const startVideoFpsMonitor = () => {
+  const video = getActiveVideo();
+  STATE.debug.videoMonitorToken += 1;
+  const token = STATE.debug.videoMonitorToken;
+
+  STATE.debug.videoFps = null;
+  STATE.debug.dropsPerSec = null;
+  STATE.debug.lastDecodedFrames = null;
+  STATE.debug.lastDroppedFrames = null;
+  STATE.debug.lastFrameSampleTs = null;
+
+  if (!video) {
+    updateDebugMetrics();
+    return;
+  }
+
+  // Best signal: actual video frame delivery
+  if (typeof video.requestVideoFrameCallback === 'function') {
+    let count = 0;
+    let droppedAtStart = null;
+    let totalAtStart = null;
+    let windowStart = performance.now();
+
+    const onFrame = () => {
+      if (token !== STATE.debug.videoMonitorToken) return;
+
+      count += 1;
+      const now = performance.now();
+      const elapsed = now - windowStart;
+
+      // For drops/sec, sample counters occasionally
+      const counters = getFrameCounters(video);
+      if (counters && droppedAtStart === null && typeof counters.dropped === 'number') {
+        droppedAtStart = counters.dropped;
+        totalAtStart = counters.decoded;
+      }
+
+      if (elapsed >= 1000) {
+        STATE.debug.videoFps = (count * 1000) / elapsed;
+        count = 0;
+        windowStart = now;
+
+        if (counters && typeof counters.dropped === 'number' && droppedAtStart !== null) {
+          const droppedDelta = counters.dropped - droppedAtStart;
+          const totalDelta = counters.decoded - (totalAtStart ?? counters.decoded);
+          // If totals reset between videos, clamp
+          const safeDroppedDelta = Number.isFinite(droppedDelta) ? Math.max(0, droppedDelta) : 0;
+          const safeTotalDelta = Number.isFinite(totalDelta) ? Math.max(0, totalDelta) : 0;
+          STATE.debug.dropsPerSec = safeDroppedDelta;
+          droppedAtStart = counters.dropped;
+          totalAtStart = counters.decoded;
+          // If a browser doesn't drop but stutters, videoFps will reflect it.
+          void safeTotalDelta;
+        }
+
+        updateDebugMetrics();
+      }
+
+      video.requestVideoFrameCallback(onFrame);
+    };
+
+    video.requestVideoFrameCallback(onFrame);
+    return;
+  }
+
+  // Fallback: poll decoded-frame counters and compute deltas per second
+  const poll = () => {
+    if (token !== STATE.debug.videoMonitorToken) return;
+
+    const now = performance.now();
+    const counters = getFrameCounters(video);
+    if (counters) {
+      const lastTs = STATE.debug.lastFrameSampleTs;
+      const lastDecoded = STATE.debug.lastDecodedFrames;
+      const lastDropped = STATE.debug.lastDroppedFrames;
+
+      if (typeof lastTs === 'number' && typeof lastDecoded === 'number') {
+        const dt = (now - lastTs) / 1000;
+        if (dt > 0) {
+          const decodedDelta = Math.max(0, counters.decoded - lastDecoded);
+          STATE.debug.videoFps = decodedDelta / dt;
+
+          if (typeof counters.dropped === 'number' && typeof lastDropped === 'number') {
+            const droppedDelta = Math.max(0, counters.dropped - lastDropped);
+            STATE.debug.dropsPerSec = droppedDelta / dt;
+          }
+          updateDebugMetrics();
+        }
+      }
+
+      STATE.debug.lastFrameSampleTs = now;
+      STATE.debug.lastDecodedFrames = counters.decoded;
+      STATE.debug.lastDroppedFrames = typeof counters.dropped === 'number' ? counters.dropped : null;
+    }
+
+    setTimeout(poll, 1000);
+  };
+
+  poll();
 };
 
 const updateStatus = (connected) => {
