@@ -15,6 +15,14 @@ body {
     background: black;
 }
 
+/* Hide all text-based UI (videos only) */
+.stage-title,
+.stage-display,
+.debug-toggle,
+.debug-panel {
+    display: none !important;
+}
+
 /* ===== VIDEO CONTAINER ===== */
 .video-container {
     position: fixed;

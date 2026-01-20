@@ -148,35 +148,19 @@ document.addEventListener('click', (e) => {
 
 // ===== DEBUG PANEL =====
 const toggleDebugPanel = () => {
-  document.getElementById('debugPanel').classList.toggle('show');
+  // Intentionally no-op: UI text removed
 };
 
 const addLog = (message) => {
-  const log = document.getElementById('messageLog');
-  const entry = document.createElement('div');
-  entry.className = 'log-entry';
-  entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-  log.appendChild(entry);
-  log.scrollTop = log.scrollHeight;
+  // Intentionally no-op: UI text removed
 };
 
 const updateStatus = (connected) => {
-  const status = document.getElementById('status');
-  const text = document.getElementById('statusText');
-  
-  if (connected) {
-    status.classList.remove('disconnected');
-    status.classList.add('connected');
-    text.textContent = 'Connected ✓';
-  } else {
-    status.classList.remove('connected');
-    status.classList.add('disconnected');
-    text.textContent = 'Disconnected ✗';
-  }
+  // Intentionally no-op: UI text removed
 };
 
 const updateFeedback = (message) => {
-  document.getElementById('feedback').textContent = message;
+  // Intentionally no-op: UI text removed
 };
 
 // ===== WEBSOCKET MANAGEMENT =====

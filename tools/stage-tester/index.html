@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stage Tester</title>
+    <!-- For VS Code Live Server, this assumes the server root is the workspace folder -->
+    <link rel="stylesheet" href="/public/style.css">
+    <style>
+        /* Stage tester overlay UI */
+        .tester-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: black;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.3em;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+
+        .tester-toggle:hover {
+            transform: scale(1.1);
+            background: white;
+            color: black;
+        }
+
+        .tester-panel {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid white;
+            border-radius: 10px;
+            padding: 15px;
+            width: min(520px, calc(100vw - 40px));
+            max-height: 70vh;
+            overflow-y: auto;
+            display: none;
+            z-index: 99;
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        .tester-panel.show {
+            display: block;
+        }
+
+        .tester-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid white;
+            padding-bottom: 5px;
+        }
+
+        .tester-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 8px 0;
+        }
+
+        .tester-btn {
+            padding: 8px 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .tester-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .tester-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .tester-meta {
+            opacity: 0.9;
+            line-height: 1.4;
+        }
+
+        .tester-input {
+            flex: 1;
+            min-width: 160px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-family: inherit;
+        }
+
+        .tester-log {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid white;
+            max-height: 220px;
+            overflow-y: auto;
+            color: #00ff00;
+        }
+
+        .tester-log-entry {
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        @media (max-width: 667px) {
+            .tester-toggle {
+                bottom: 15px;
+                right: 15px;
+                width: 45px;
+                height: 45px;
+                font-size: 1.1em;
+            }
+
+            .tester-panel {
+                bottom: 70px;
+                right: 15px;
+                width: calc(100vw - 30px);
+                font-size: 0.75em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stage-title" id="stageTitle"></div>
+    <div class="stage-display">
+        <div class="stage-text" id="stageText"></div>
+    </div>
+
+    <button class="tester-toggle" id="testerToggle" title="Stage Tester Panel">🧪</button>
+
+    <div class="tester-panel" id="testerPanel">
+        <div class="tester-title">Stage Tester (Live Server)</div>
+
+        <div class="tester-meta" id="testerMeta">
+            Stage: <span id="currentStageId">-</span>
+            <br>
+            WS: <span id="wsStatus">Disconnected</span>
+        </div>
+
+        <div class="tester-row">
+            <input class="tester-input" id="wsUrl" placeholder="WebSocket URL (ws://host:port)" />
+            <button class="tester-btn" id="btnConnect">Connect</button>
+            <button class="tester-btn" id="btnDisconnect">Disconnect</button>
+        </div>
+
+        <div class="tester-row">
+            <button class="tester-btn" id="btnSend1" title="Live client sends '1' when the site loads">Send "1" (init)</button>
+            <button class="tester-btn" id="btnInteract" title="Live client sends '2' when user interacts during video3-looping">Interact (send "2")</button>
+        </div>
+
+        <div class="tester-row">
+            <button class="tester-btn" id="btnPrev">← Prev Stage</button>
+            <button class="tester-btn" id="btnNext">Next Stage →</button>
+            <button class="tester-btn" id="btnReset">Reset to video1</button>
+            <button class="tester-btn" id="btnRunLiveFlow" title="Simulates: 1 → 2 → 3(loop) → (interaction) → 4 → 5 → 6(loop 3s) → 7">Run Live Flow</button>
+        </div>
+
+        <div class="tester-row">
+            <input class="tester-input" id="manualMessage" placeholder="Manual message (e.g. 1, 2, hello)" />
+            <button class="tester-btn" id="btnSendManual">Send</button>
+        </div>
+
+        <div class="tester-log" id="testerLog"></div>
+    </div>
+
+    <script src="/public/config.js"></script>
+    <script>
+        const STATE = {
+            ws: null,
+            currentIndex: 0,
+            currentStageId: CONFIG.stages?.[0]?.id || 'video1',
+            hasInteracted: false,
+            loop6TimeoutId: null
+        };
+
+        const els = {
+            stageTitle: document.getElementById('stageTitle'),
+            stageText: document.getElementById('stageText'),
+            stageDisplay: document.querySelector('.stage-display'),
+            testerToggle: document.getElementById('testerToggle'),
+            testerPanel: document.getElementById('testerPanel'),
+            currentStageId: document.getElementById('currentStageId'),
+            wsStatus: document.getElementById('wsStatus'),
+            wsUrl: document.getElementById('wsUrl'),
+            testerLog: document.getElementById('testerLog'),
+            manualMessage: document.getElementById('manualMessage'),
+            btnConnect: document.getElementById('btnConnect'),
+            btnDisconnect: document.getElementById('btnDisconnect'),
+            btnSend1: document.getElementById('btnSend1'),
+            btnInteract: document.getElementById('btnInteract'),
+            btnPrev: document.getElementById('btnPrev'),
+            btnNext: document.getElementById('btnNext'),
+            btnReset: document.getElementById('btnReset'),
+            btnRunLiveFlow: document.getElementById('btnRunLiveFlow'),
+            btnSendManual: document.getElementById('btnSendManual')
+        };
+
+        const addLog = (message) => {
+            const entry = document.createElement('div');
+            entry.className = 'tester-log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            els.testerLog.appendChild(entry);
+            els.testerLog.scrollTop = els.testerLog.scrollHeight;
+        };
+
+        const setWsStatus = (connected) => {
+            els.wsStatus.textContent = connected ? 'Connected' : 'Disconnected';
+        };
+
+        const normalizeWsUrl = (raw) => {
+            const value = (raw || '').trim();
+            if (!value) return null;
+            if (value.startsWith('ws://') || value.startsWith('wss://')) return value;
+            if (value.startsWith('http://')) return 'ws://' + value.slice('http://'.length);
+            if (value.startsWith('https://')) return 'wss://' + value.slice('https://'.length);
+            // allow host:port
+            return 'ws://' + value;
+        };
+
+        const getDefaultWsUrl = () => {
+            const params = new URLSearchParams(window.location.search);
+            const fromQuery = params.get('ws');
+            if (fromQuery) return fromQuery;
+            return 'ws://localhost:8080';
+        };
+
+        const sendWs = (data) => {
+            if (STATE.ws?.readyState === WebSocket.OPEN) {
+                STATE.ws.send(data.toString());
+                addLog(`📤 Sent: ${data}`);
+                return true;
+            }
+            addLog('⚠️ Not connected');
+            return false;
+        };
+
+        const connectWebSocket = () => {
+            if (STATE.ws && (STATE.ws.readyState === WebSocket.OPEN || STATE.ws.readyState === WebSocket.CONNECTING)) {
+                addLog('ℹ️ WebSocket already connecting/connected');
+                return;
+            }
+
+            const wsUrl = normalizeWsUrl(els.wsUrl.value);
+            if (!wsUrl) {
+                addLog('⚠️ Please enter a WebSocket URL');
+                return;
+            }
+
+            addLog(`🔌 Connecting: ${wsUrl}`);
+            STATE.ws = new WebSocket(wsUrl);
+
+            STATE.ws.onopen = () => {
+                setWsStatus(true);
+                addLog('✅ Connected');
+            };
+
+            STATE.ws.onmessage = (e) => {
+                const payload = (() => {
+                    try { return JSON.parse(e.data); }
+                    catch { return e.data; }
+                })();
+
+                if (typeof payload === 'object' && payload !== null) {
+                    addLog(`📨 ${payload.type || 'object'} ${payload.timestamp ? `@ ${payload.timestamp}` : ''}`.trim());
+                } else {
+                    addLog(`📨 ${payload}`);
+                }
+            };
+
+            STATE.ws.onerror = () => addLog('❌ Connection error');
+
+            STATE.ws.onclose = () => {
+                setWsStatus(false);
+                addLog('⚠️ Disconnected');
+            };
+        };
+
+        const disconnectWebSocket = () => {
+            if (!STATE.ws) return;
+            try { STATE.ws.close(); }
+            catch { /* ignore */ }
+        };
+
+        const setStage = (stageId) => {
+            const idx = CONFIG.getStageIndex(stageId);
+            if (idx >= 0) STATE.currentIndex = idx;
+            STATE.currentStageId = stageId;
+            els.currentStageId.textContent = stageId;
+
+            if (STATE.loop6TimeoutId) {
+                clearTimeout(STATE.loop6TimeoutId);
+                STATE.loop6TimeoutId = null;
+            }
+
+            const stage = CONFIG.getStage(stageId);
+            els.stageTitle.textContent = stage?.title || '';
+            els.stageText.textContent = stage?.text || '';
+
+            // Reset classes / clickability
+            els.stageText.classList.remove('interactive', 'black-text');
+            els.stageTitle.classList.remove('black-text');
+            els.stageDisplay.classList.remove('interactive');
+
+            // Mirror live client rules
+            if (stageId === 'video3-looping') {
+                els.stageDisplay.classList.add('interactive');
+                els.stageText.classList.add('interactive');
+            }
+
+            if (stageId === 'video6-looping') {
+                els.stageTitle.classList.add('black-text');
+                els.stageText.classList.add('black-text');
+            }
+
+            // Enable/disable interact button based on current stage
+            els.btnInteract.disabled = !(stageId === 'video3-looping' && !STATE.hasInteracted);
+        };
+
+        const nextStage = () => {
+            const next = CONFIG.getNextStage(STATE.currentStageId);
+            if (next?.id) {
+                setStage(next.id);
+                return;
+            }
+            addLog('ℹ️ Already at last stage');
+        };
+
+        const previousStage = () => {
+            const prev = CONFIG.getPrevStage(STATE.currentStageId);
+            if (prev?.id) {
+                setStage(prev.id);
+                return;
+            }
+            addLog('ℹ️ Already at first stage');
+        };
+
+        const startTimedLoop6Then7 = (ms) => {
+            setStage('video6-looping');
+            STATE.loop6TimeoutId = setTimeout(() => {
+                STATE.loop6TimeoutId = null;
+                setStage('video7');
+                addLog('⏱️ Auto-advanced: video6-looping → video7');
+            }, ms);
+        };
+
+        const handleInteraction = () => {
+            if (STATE.hasInteracted) return;
+            if (STATE.currentStageId !== 'video3-looping') return;
+
+            STATE.hasInteracted = true;
+            els.btnInteract.disabled = true;
+
+            // Live client: interaction during video3-looping sends "2"
+            sendWs('2');
+
+            // Then: 4 → 5 → loop 6 for 3s → 7
+            // Stage tester has no video timings, so we step quickly but keep IDs accurate.
+            setStage('video4');
+            setTimeout(() => setStage('video5'), 250);
+            setTimeout(() => startTimedLoop6Then7(3000), 500);
+        };
+
+        const resetFlow = () => {
+            STATE.hasInteracted = false;
+            setStage(CONFIG.stages?.[0]?.id || 'video1');
+            addLog('↩️ Reset flow');
+        };
+
+        const runLiveFlow = () => {
+            resetFlow();
+            setTimeout(() => setStage('video2'), 300);
+            setTimeout(() => {
+                setStage('video3-looping');
+                addLog('🕒 Awaiting interaction (click stage text / Interact button)');
+            }, 600);
+        };
+
+        // UI events
+        els.testerToggle.addEventListener('click', () => {
+            els.testerPanel.classList.toggle('show');
+        });
+
+        els.btnConnect.addEventListener('click', connectWebSocket);
+        els.btnDisconnect.addEventListener('click', disconnectWebSocket);
+        els.btnSend1.addEventListener('click', () => sendWs('1'));
+        els.btnInteract.addEventListener('click', handleInteraction);
+        els.btnPrev.addEventListener('click', previousStage);
+        els.btnNext.addEventListener('click', nextStage);
+        els.btnReset.addEventListener('click', resetFlow);
+        els.btnRunLiveFlow.addEventListener('click', runLiveFlow);
+        els.btnSendManual.addEventListener('click', () => {
+            const value = (els.manualMessage.value || '').trim();
+            if (!value) return;
+            sendWs(value);
+        });
+
+        // Mirror live "interactive stage" click behavior
+        els.stageText.addEventListener('click', () => {
+            if (STATE.currentStageId === 'video3-looping') handleInteraction();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') nextStage();
+            else if (e.key === 'ArrowLeft') previousStage();
+            else if (e.key === ' ') {
+                handleInteraction();
+            }
+        });
+
+        // Initialize
+        els.wsUrl.value = getDefaultWsUrl();
+        setStage(STATE.currentStageId);
+        setWsStatus(false);
+        addLog('Ready. Click 🧪 to open tester panel.');
+        addLog('Tip: append ?ws=ws://YOUR_SERVER:8080 to set WS target.');
+    </script>
+</body>
+</html>
