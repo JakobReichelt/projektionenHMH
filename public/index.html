@@ -37,19 +37,21 @@
         <div class="stage-text" id="stageText"></div>
     </div>
 
-    <button class="debug-toggle" onclick="toggleDebugPanel()"></button>
+    <button class="debug-toggle" onclick="toggleDebugPanel()">🔧</button>
 
     <div class="debug-panel" id="debugPanel">
-        <div class="debug-panel-title"></div>
+        <div class="debug-panel-title">Debug Menu</div>
         
         <div class="status disconnected" id="status">
-            <span id="statusText"></span>
+            Status: <span id="statusText">Disconnected</span>
         </div>
 
         <div class="feedback" id="feedback">
+            Waiting for input...
         </div>
 
         <div class="message-log" id="messageLog">
+            <div class="log-entry">Initializing connection...</div>
         </div>
     </div>
 

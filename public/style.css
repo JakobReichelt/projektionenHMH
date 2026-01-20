@@ -15,11 +15,9 @@ body {
     background: black;
 }
 
-/* Hide all text-based UI (videos only) */
+/* Hide stage text UI (videos only), but keep debug menu available */
 .stage-title,
-.stage-display,
-.debug-toggle,
-.debug-panel {
+.stage-display {
     display: none !important;
 }
 
