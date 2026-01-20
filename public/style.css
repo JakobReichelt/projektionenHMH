@@ -200,6 +200,45 @@ body {
     padding-bottom: 5px;
 }
 
+.debug-actions {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.debug-action {
+    background: transparent;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.9em;
+}
+
+.debug-action:hover {
+    border-color: white;
+}
+
+.debug-metrics {
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 2px 0;
+}
+
+.metric-label {
+    opacity: 0.85;
+}
+
 .status {
     margin-bottom: 10px;
     font-weight: bold;

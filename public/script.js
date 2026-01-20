@@ -8,8 +8,15 @@ const STATE = {
   iosInitiated: false,
   videos: {},
   isIOS: CONFIG.isIOS(),
-  loop6TimeoutId: null
+  loop6TimeoutId: null,
+  activeVideoId: null,
+  debug: {
+    fps: null,
+    rafId: null
+  }
 };
+
+const MAX_LOG_ENTRIES = 200;
 
 // Cache video elements on load
 const initVideos = () => {
@@ -55,14 +62,43 @@ const updateStageDisplay = (stageId) => {
   }
 
   console.log(`Stage: ${stageId}`);
+  updateDebugMetrics();
 };
 
 // ===== VIDEO PLAYBACK =====
+const ensureVideoSourceLoaded = (videoId) => {
+  const video = STATE.videos[videoId];
+  if (!video) return false;
+
+  const source = video.querySelector('source');
+  if (!source) return false;
+
+  const hasSrc = !!source.getAttribute('src');
+  const dataSrc = source.getAttribute('data-src');
+  if (!hasSrc && dataSrc) {
+    source.setAttribute('src', dataSrc);
+    video.load();
+  }
+
+  return true;
+};
+
+const preloadVideoSource = (videoId) => {
+  try {
+    ensureVideoSourceLoaded(videoId);
+  } catch {
+    // no-op
+  }
+};
+
 const playVideo = (videoId, onEnded = null, isLooping = false) => {
   if (STATE.loop6TimeoutId) {
     clearTimeout(STATE.loop6TimeoutId);
     STATE.loop6TimeoutId = null;
   }
+
+  // Load just-in-time to avoid downloading all MP4s at once.
+  ensureVideoSourceLoaded(videoId);
 
   Object.values(STATE.videos).forEach(v => {
     v.classList.remove('active');
@@ -75,6 +111,9 @@ const playVideo = (videoId, onEnded = null, isLooping = false) => {
   video.onended = onEnded;
   video.currentTime = 0;
 
+  STATE.activeVideoId = videoId;
+  updateDebugMetrics();
+
   (video.play() || Promise.resolve())
     .catch(err => console.error(`Failed to play ${videoId}:`, err));
 };
@@ -83,12 +122,19 @@ const initializeVideoSequence = () => {
   document.getElementById('stageTitle').textContent = '';
   document.getElementById('stageText').textContent = '';
 
+  // Warm up first and next video only.
+  preloadVideoSource('video1');
+  preloadVideoSource('video2');
+
   // 1 -> 2 -> loop 3 (wait interaction) -> 4 -> 5 -> loop 6 for 3s -> 7
   playVideo('video1', () => {
     STATE.currentStage = 'video2';
     updateStageDisplay('video2');
 
+    preloadVideoSource('video3');
+
     playVideo('video2', () => {
+      preloadVideoSource('video4');
       playVideo('video3', null, true);
       STATE.currentStage = 'video3-looping';
       updateStageDisplay('video3-looping');
@@ -98,6 +144,8 @@ const initializeVideoSequence = () => {
 };
 
 const startTimedLoop6Then7 = (ms) => {
+  preloadVideoSource('video6');
+  preloadVideoSource('video7');
   playVideo('video6', null, true);
   STATE.currentStage = 'video6-looping';
   updateStageDisplay('video6-looping');
@@ -113,6 +161,12 @@ const startTimedLoop6Then7 = (ms) => {
 
 // ===== INTERACTION HANDLING =====
 const handleInteraction = () => {
+  if (STATE.isIOS && !STATE.iosInitiated) {
+    STATE.iosInitiated = true;
+    initializeVideoSequence();
+    return;
+  }
+
   if (STATE.hasInteracted) return;
   STATE.hasInteracted = true;
 
@@ -125,6 +179,7 @@ const handleInteraction = () => {
       // Interaction during looping 3 triggers 4 -> 5 -> loop 6 for 3s -> 7
       STATE.currentStage = 'video4';
       updateStageDisplay('video4');
+      preloadVideoSource('video5');
       playVideo('video4', () => {
         STATE.currentStage = 'video5';
         updateStageDisplay('video5');
@@ -157,7 +212,96 @@ const addLog = (message) => {
   entry.className = 'log-entry';
   entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
   log.appendChild(entry);
+
+  while (log.children.length > MAX_LOG_ENTRIES) {
+    log.removeChild(log.firstElementChild);
+  }
+
   log.scrollTop = log.scrollHeight;
+};
+
+const clearLog = () => {
+  const log = document.getElementById('messageLog');
+  log.innerHTML = '';
+  addLog('Log cleared');
+};
+
+const getActiveVideo = () => {
+  const video = STATE.activeVideoId ? STATE.videos[STATE.activeVideoId] : null;
+  return video || null;
+};
+
+const formatVideoState = (video) => {
+  if (!video) return '-';
+
+  const ready = video.readyState;
+  const net = video.networkState;
+  // readyState: 0..4, networkState: 0..3
+  return `ready=${ready} net=${net} t=${video.currentTime.toFixed(1)}`;
+};
+
+const getFrameStats = (video) => {
+  if (!video) return '-';
+  try {
+    if (typeof video.getVideoPlaybackQuality === 'function') {
+      const q = video.getVideoPlaybackQuality();
+      const dropped = q.droppedVideoFrames ?? q.droppedVideoFrameCount;
+      const total = q.totalVideoFrames ?? q.totalVideoFrameCount;
+      if (typeof total === 'number') {
+        return `dropped=${dropped ?? '?'} total=${total}`;
+      }
+    }
+
+    // WebKit counters (Safari)
+    const decoded = video.webkitDecodedFrameCount;
+    const dropped = video.webkitDroppedFrameCount;
+    if (typeof decoded === 'number') {
+      return `dropped=${dropped ?? '?'} decoded=${decoded}`;
+    }
+  } catch {
+    // ignore
+  }
+  return '-';
+};
+
+const updateDebugMetrics = () => {
+  const stageEl = document.getElementById('debugStage');
+  const videoEl = document.getElementById('debugVideo');
+  const fpsEl = document.getElementById('debugFps');
+  const statesEl = document.getElementById('debugStates');
+  const framesEl = document.getElementById('debugFrames');
+
+  if (!stageEl || !videoEl || !fpsEl || !statesEl || !framesEl) return;
+
+  const activeVideo = getActiveVideo();
+
+  stageEl.textContent = STATE.currentStage || '-';
+  videoEl.textContent = STATE.activeVideoId || '-';
+  fpsEl.textContent = STATE.debug.fps ? `${STATE.debug.fps.toFixed(0)}` : '-';
+  statesEl.textContent = formatVideoState(activeVideo);
+  framesEl.textContent = getFrameStats(activeVideo);
+};
+
+const startFpsMonitor = () => {
+  let last = performance.now();
+  let frames = 0;
+  let lastReport = last;
+
+  const tick = (now) => {
+    frames += 1;
+    const elapsed = now - lastReport;
+    if (elapsed >= 1000) {
+      STATE.debug.fps = (frames * 1000) / elapsed;
+      frames = 0;
+      lastReport = now;
+      updateDebugMetrics();
+    }
+    last = now;
+    STATE.debug.rafId = requestAnimationFrame(tick);
+  };
+
+  if (STATE.debug.rafId) cancelAnimationFrame(STATE.debug.rafId);
+  STATE.debug.rafId = requestAnimationFrame(tick);
 };
 
 const updateStatus = (connected) => {
@@ -243,6 +387,16 @@ const sendButton = (buttonName) => {
 window.addEventListener('load', () => {
   initVideos();
   connectWebSocket();
+
+  document.getElementById('clearLogBtn')?.addEventListener('click', clearLog);
+  startFpsMonitor();
+
+  // Useful playback events (helps diagnose buffering)
+  Object.entries(STATE.videos).forEach(([id, video]) => {
+    video.addEventListener('waiting', () => addLog(`⏳ Buffering: ${id}`));
+    video.addEventListener('playing', () => addLog(`▶️ Playing: ${id}`));
+    video.addEventListener('stalled', () => addLog(`⚠️ Stalled: ${id}`));
+  });
   
   if (!STATE.isIOS) {
     setTimeout(initializeVideoSequence, 500);

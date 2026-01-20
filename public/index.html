@@ -8,26 +8,26 @@
 </head>
 <body>
     <div class="video-container">
-        <video class="background-video" id="video1" playsinline webkit-playsinline muted autoplay>
-            <source src="/1.mp4" type="video/mp4">
+        <video class="background-video" id="video1" playsinline webkit-playsinline muted preload="none">
+            <source data-src="/1.mp4" type="video/mp4">
         </video>
-        <video class="background-video" id="video2" playsinline webkit-playsinline muted loop>
-            <source src="/2.mp4" type="video/mp4">
+        <video class="background-video" id="video2" playsinline webkit-playsinline muted loop preload="none">
+            <source data-src="/2.mp4" type="video/mp4">
         </video>
-        <video class="background-video" id="video3" playsinline webkit-playsinline muted>
-            <source src="/3.mp4" type="video/mp4">
+        <video class="background-video" id="video3" playsinline webkit-playsinline muted preload="none">
+            <source data-src="/3.mp4" type="video/mp4">
         </video>
-        <video class="background-video" id="video4" playsinline webkit-playsinline muted loop>
-            <source src="/4.mp4" type="video/mp4">
+        <video class="background-video" id="video4" playsinline webkit-playsinline muted loop preload="none">
+            <source data-src="/4.mp4" type="video/mp4">
         </video>
-        <video class="background-video" id="video5" playsinline webkit-playsinline muted>
-            <source src="/5.mp4" type="video/mp4">
+        <video class="background-video" id="video5" playsinline webkit-playsinline muted preload="none">
+            <source data-src="/5.mp4" type="video/mp4">
         </video>
-        <video class="background-video" id="video6" playsinline webkit-playsinline muted loop>
-            <source src="/6.mp4" type="video/mp4">
+        <video class="background-video" id="video6" playsinline webkit-playsinline muted loop preload="none">
+            <source data-src="/6.mp4" type="video/mp4">
         </video>
-        <video class="background-video" id="video7" playsinline webkit-playsinline muted>
-            <source src="/7.mp4" type="video/mp4">
+        <video class="background-video" id="video7" playsinline webkit-playsinline muted preload="none">
+            <source data-src="/7.mp4" type="video/mp4">
         </video>
     </div>
 
@@ -41,6 +41,18 @@
 
     <div class="debug-panel" id="debugPanel">
         <div class="debug-panel-title">Debug Menu</div>
+
+        <div class="debug-actions">
+            <button class="debug-action" id="clearLogBtn" type="button">Clear log</button>
+        </div>
+
+        <div class="debug-metrics">
+            <div class="metric-row"><span class="metric-label">Stage</span><span id="debugStage">-</span></div>
+            <div class="metric-row"><span class="metric-label">Video</span><span id="debugVideo">-</span></div>
+            <div class="metric-row"><span class="metric-label">FPS</span><span id="debugFps">-</span></div>
+            <div class="metric-row"><span class="metric-label">State</span><span id="debugStates">-</span></div>
+            <div class="metric-row"><span class="metric-label">Frames</span><span id="debugFrames">-</span></div>
+        </div>
         
         <div class="status disconnected" id="status">
             Status: <span id="statusText">Disconnected</span>
