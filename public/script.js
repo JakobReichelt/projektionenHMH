@@ -52,6 +52,21 @@ const initVideos = () => {
   };
 };
 
+const hydrateAllVideoSources = () => {
+  // Some mobile browsers log errors when <source> has no src at parse time.
+  // We keep lazy loading behavior by not calling video.load() here.
+  Object.values(STATE.videos).forEach((video) => {
+    if (!video) return;
+    const source = video.querySelector('source');
+    if (!source) return;
+    const hasSrc = !!source.getAttribute('src');
+    const dataSrc = source.getAttribute('data-src');
+    if (!hasSrc && dataSrc) {
+      source.setAttribute('src', dataSrc);
+    }
+  });
+};
+
 // ===== STAGE DISPLAY =====
 const updateStageDisplay = (stageId) => {
   const stage = CONFIG.getStage(stageId);
@@ -751,6 +766,7 @@ const sendButton = (buttonName) => {
 // ===== INITIALIZATION =====
 window.addEventListener('load', () => {
   initVideos();
+  hydrateAllVideoSources();
   connectWebSocket();
 
   // iPhone Safari requires a user gesture to start video playback.
@@ -777,6 +793,11 @@ window.addEventListener('load', () => {
     video.addEventListener('waiting', () => addLogThrottled(`waiting:${id}`, `⏳ Buffering: ${id}`, throttle));
     video.addEventListener('playing', () => addLogThrottled(`playing:${id}`, `▶️ Playing: ${id}`, throttle));
     video.addEventListener('stalled', () => addLogThrottled(`stalled:${id}`, `⚠️ Stalled: ${id}`, throttle));
+    video.addEventListener('error', () => {
+      const code = video?.error?.code;
+      const src = video?.currentSrc || video?.querySelector('source')?.getAttribute('src') || '-';
+      addLogThrottled(`error:${id}`, `❌ Video error (${id}) code=${code ?? '?'} src=${src}`, 2000);
+    });
   });
   
   if (!STATE.isIOS) {
