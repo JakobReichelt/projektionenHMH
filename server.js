@@ -172,6 +172,8 @@ app.get(/^\/(?:[1-6])\.mp4$/, (req, res, next) => {
       // This response varies by both Host (subdomain) and Cookie (show selection).
       res.append('Vary', 'Host');
       res.append('Vary', 'Cookie');
+      // Cache for 1 hour to reduce stutter on replay/loop
+      res.setHeader('Cache-Control', 'public, max-age=3600');
       return res.sendFile(filePath);
     }
   }

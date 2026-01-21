@@ -8,24 +8,9 @@
 </head>
 <body>
     <div class="video-container">
-        <video class="background-video" id="video1" playsinline webkit-playsinline muted preload="none">
-            <source data-src="/1.mp4" type="video/mp4">
-        </video>
-        <video class="background-video" id="video2" playsinline webkit-playsinline muted loop preload="none">
-            <source data-src="/2.mp4" type="video/mp4">
-        </video>
-        <video class="background-video" id="video3" playsinline webkit-playsinline muted preload="none">
-            <source data-src="/3.mp4" type="video/mp4">
-        </video>
-        <video class="background-video" id="video4" playsinline webkit-playsinline muted loop preload="none">
-            <source data-src="/4.mp4" type="video/mp4">
-        </video>
-        <video class="background-video" id="video5" playsinline webkit-playsinline muted preload="none">
-            <source data-src="/5.mp4" type="video/mp4">
-        </video>
-        <video class="background-video" id="video6" playsinline webkit-playsinline muted loop preload="none">
-            <source data-src="/6.mp4" type="video/mp4">
-        </video>
+        <!-- Double Buffer System for smooth transitions -->
+        <video class="background-video" id="video-layer-1" playsinline webkit-playsinline muted preload="auto"></video>
+        <video class="background-video" id="video-layer-2" playsinline webkit-playsinline muted preload="auto"></video>
     </div>
 
     <div class="start-overlay hidden" id="startOverlay" role="button" aria-label="Berühre um zu beginnen" tabindex="0">
