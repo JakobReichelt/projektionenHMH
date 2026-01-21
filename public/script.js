@@ -39,9 +39,9 @@ class VideoPlayer {
     this.video2 = document.getElementById('video-layer-2');
     this.active = this.video1;
     this.pending = this.video2;
-    this.preloadCache = new Map(); // Track preloaded videos
+    this.videoCache = new Map(); // Cache actual loaded video blobs
     this.isPreloading = false;
-    this.hasStartedPlayback = false; // Track if initial video started
+    this.hasStartedPlayback = false;
     
     // Ensure videos start hidden
     this.video1.classList.remove('active');
@@ -54,89 +54,68 @@ class VideoPlayer {
     [this.video1, this.video2].forEach(video => {
       video.addEventListener('ended', () => this.onVideoEnded(video));
       video.addEventListener('error', (e) => this.onVideoError(video, e));
-      video.addEventListener('canplay', () => {
-        const stage = video.dataset.stage || video.dataset.preload;
-        if (stage) {
-          log(`✓ Video ready: ${stage}`);
-          this.preloadCache.set(stage, true);
-        }
-      }, { once: true }); // Only log once per video load
-      
-      // Don't log waiting/buffering events - they spam mobile logs
+      video.addEventListener('canplaythrough', () => {
+        const stage = video.dataset.stage;
+        if (stage) log(`✓ Video buffered: ${stage}`);
+      }, { once: true });
     });
   }
 
-  // Preload ALL videos on page load to eliminate lag
+  // Preload ALL videos - fetch and cache as blobs for instant playback
   async preloadAllVideos() {
     if (this.isPreloading) return;
     this.isPreloading = true;
     
-    log('🔄 Preloading all videos...');
+    log('🔄 Preloading all videos into memory...');
     
-    // Load in correct order: video1, video2, video3-looping, video4, video5, video6-looping
-    const videoOrder = [
-      'video1',
-      'video2', 
-      'video3-looping',
-      'video4',
-      'video5',
-      'video6-looping'
-    ];
+    const videoOrder = ['video1', 'video2', 'video3-looping', 'video4', 'video5', 'video6-looping'];
     
-    // Preload sequentially to ensure proper order
     for (const videoId of videoOrder) {
       const videoPath = VIDEO_PATHS[videoId];
-      await new Promise((resolve) => {
-        const tempVideo = document.createElement('video');
-        tempVideo.preload = 'auto';
-        tempVideo.src = videoPath;
-        tempVideo.dataset.preload = videoId;
+      
+      try {
+        log(`⬇️ Fetching: ${videoId}...`);
+        const response = await fetch(videoPath);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
         
-        tempVideo.addEventListener('loadeddata', () => {
-          log(`✓ Preloaded: ${videoId}`);
-          this.preloadCache.set(videoId, true);
-          resolve();
-        }, { once: true });
-        
-        tempVideo.addEventListener('error', () => {
-          log(`⚠️ Preload failed: ${videoId}`);
-          resolve(); // Don't block on errors
-        }, { once: true });
-        
-        // Timeout fallback
-        setTimeout(() => resolve(), 5000);
-        
-        tempVideo.load();
-      });
+        this.videoCache.set(videoId, blobUrl);
+        log(`✓ Cached: ${videoId} (${(blob.size / 1024 / 1024).toFixed(1)}MB)`);
+      } catch (error) {
+        console.error(`Failed to preload ${videoId}:`, error);
+        log(`❌ Failed: ${videoId}`);
+        // Fallback to direct path
+        this.videoCache.set(videoId, videoPath);
+      }
     }
     
-    log('✅ All videos preloaded');
+    log('✅ All videos cached in memory');
     this.isPreloading = false;
   }
 
   async loadAndPlay(stageId) {
-    const videoPath = VIDEO_PATHS[stageId];
     const config = STAGE_FLOW[stageId];
     
-    if (!videoPath || !config) {
+    if (!config) {
       console.error(`Invalid stage: ${stageId}`);
       return false;
     }
 
     log(`▶️ Playing: ${stageId}`);
     
+    // Get cached video URL (blob or fallback path)
+    const cachedUrl = this.videoCache.get(stageId) || VIDEO_PATHS[stageId];
+    
     // Prepare pending video
     this.pending.loop = config.loop;
     this.pending.dataset.stage = stageId;
-    this.pending.preload = 'auto'; // Ensure preload attribute is set
+    this.pending.preload = 'auto';
     
-    // Load video if different source
-    const fullPath = window.location.origin + videoPath;
-    if (this.pending.src !== fullPath) {
-      this.pending.src = videoPath;
+    // Use cached blob URL for instant playback
+    if (this.pending.src !== cachedUrl) {
+      this.pending.src = cachedUrl;
       this.pending.load();
     } else {
-      // Video already loaded, just restart if needed
       this.pending.currentTime = 0;
     }
 
