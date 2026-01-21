@@ -286,26 +286,40 @@ function sendMessage(msg) {
 // ============================================
 
 function handleInteraction() {
-  log(`Interaction - hasInteracted: ${state.hasInteracted}, currentStage: ${state.currentStage}`);
+  const overlay = document.getElementById('startOverlay');
+  const overlayVisible = !overlay.classList.contains('hidden');
   
-  // First interaction - hide overlay and start playback
-  if (!state.hasInteracted) {
+  log(`Interaction - overlayVisible: ${overlayVisible}, hasInteracted: ${state.hasInteracted}, currentStage: ${state.currentStage}`);
+  
+  // Only handle overlay dismissal if overlay is actually visible
+  if (overlayVisible) {
     hideStartOverlay();
     state.hasInteracted = true;
     
-    log('✋ First interaction - starting video1');
+    log('✋ iOS/Autoplay blocked - dismissing overlay');
     
-    // Force video1 to start on first interaction
-    // This is critical for iOS which requires user gesture
-    videoPlayer.loadAndPlay('video1').catch(err => {
-      console.error('Failed to start video1:', err);
-      log(`❌ Failed to start: ${err.message}`);
-    });
+    // Only start video1 if it hasn't started playing yet
+    if (!videoPlayer.hasStartedPlayback) {
+      log('▶️ Starting video1 after user gesture');
+      videoPlayer.loadAndPlay('video1').catch(err => {
+        console.error('Failed to start video1:', err);
+        log(`❌ Failed to start: ${err.message}`);
+      });
+    } else {
+      // Video is already loaded, just resume if paused
+      const active = videoPlayer.active;
+      if (active.paused) {
+        log('▶️ Resuming paused video');
+        active.play().catch(err => {
+          console.error('Resume failed:', err);
+        });
+      }
+    }
     
     return;
   }
 
-  // Stage-specific interactions
+  // Stage-specific interactions (only when overlay is not visible)
   if (state.currentStage === 'video3-looping') {
     log('✋ Video 3 interaction - switching to video 4');
     sendMessage('2'); // Notify server
@@ -421,16 +435,14 @@ window.addEventListener('load', async () => {
     console.error('Preload error:', err);
   });
 
-  // Show overlay on iOS or if autoplay will fail
+  // Always show overlay and wait for user interaction
+  // This prevents double-loading video1 and ensures consistent behavior
+  showStartOverlay();
+  
   if (state.isIOS) {
-    showStartOverlay();
-    log('iOS detected - waiting for user interaction');
+    log('iOS detected - tap to start');
   } else {
-    // Try autoplay on non-iOS devices
-    videoPlayer.loadAndPlay('video1').catch(() => {
-      log('Autoplay failed - waiting for user interaction');
-      showStartOverlay();
-    });
+    log('Desktop - tap to start');
   }
 
   // Debug FPS counter
