@@ -177,16 +177,42 @@ const transitionToVideo = async (videoId, onEnded = null, isLooping = false, opt
 
   nextVideo.preload = 'auto';
   nextVideo.loop = isLooping;
-  nextVideo.onended = onEnded;
-  try {
-    nextVideo.currentTime = 0;
-  } catch {
-    // ignore
-  }
+  // 'ended' can fire immediately if the element is still at the last frame
+  // (e.g., when seeking to 0 fails before metadata is ready). Guard/retry once.
+  let playStartedAt = null;
+  let retriedPrematureEnd = false;
+  nextVideo.onended = () => {
+    if (typeof onEnded !== 'function') return;
+
+    const elapsed = typeof playStartedAt === 'number' ? (performance.now() - playStartedAt) : null;
+    if (!retriedPrematureEnd && typeof elapsed === 'number' && elapsed < 800) {
+      retriedPrematureEnd = true;
+      addLog(`🔁 Premature ended, retrying: ${videoId}`);
+      try {
+        nextVideo.pause();
+        nextVideo.currentTime = 0;
+        void (nextVideo.play() || Promise.resolve());
+        return;
+      } catch {
+        // fall through to onEnded
+      }
+    }
+
+    onEnded();
+  };
 
   if (logWait) addLog(`⏳ Preparing: ${videoId}`);
   const ready = await waitForVideoReady(nextVideo, minReadyState, timeoutMs);
   if (!ready) addLog(`⚠️ Not buffered yet: ${videoId} (ready=${nextVideo.readyState})`);
+
+  // Ensure we start from the beginning. Seeking can throw before metadata is ready,
+  // so do it after the ready wait.
+  try {
+    nextVideo.pause();
+    nextVideo.currentTime = 0;
+  } catch {
+    // ignore
+  }
 
   // Show the new video only once it has enough buffered data to render.
   Object.values(STATE.videos).forEach(v => {
@@ -199,6 +225,7 @@ const transitionToVideo = async (videoId, onEnded = null, isLooping = false, opt
   updateDebugMetrics();
 
   try {
+    playStartedAt = performance.now();
     await (nextVideo.play() || Promise.resolve());
   } catch (err) {
     console.error(`Failed to play ${videoId}:`, err);
