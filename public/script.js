@@ -160,7 +160,8 @@ const transitionToVideo = async (videoId, onEnded = null, isLooping = false, opt
   const {
     minReadyState = 3,
     timeoutMs = 4000,
-    logWait = true
+    logWait = true,
+    minPlaybackMs = 0
   } = options;
 
   const prevId = STATE.activeVideoId;
@@ -179,10 +180,14 @@ const transitionToVideo = async (videoId, onEnded = null, isLooping = false, opt
   nextVideo.loop = isLooping;
   // 'ended' can fire immediately if the element is still at the last frame
   // (e.g., when seeking to 0 fails before metadata is ready). Guard/retry once.
+  // Also: some deployments ship extremely short clips; enforce a minimum playback
+  // time before advancing to the next stage.
   let playStartedAt = null;
   let retriedPrematureEnd = false;
+  let endedDispatched = false;
   nextVideo.onended = () => {
     if (typeof onEnded !== 'function') return;
+    if (endedDispatched) return;
 
     const elapsed = typeof playStartedAt === 'number' ? (performance.now() - playStartedAt) : null;
     if (!retriedPrematureEnd && typeof elapsed === 'number' && elapsed < 800) {
@@ -198,6 +203,18 @@ const transitionToVideo = async (videoId, onEnded = null, isLooping = false, opt
       }
     }
 
+    if (typeof elapsed === 'number' && minPlaybackMs > 0 && elapsed < minPlaybackMs) {
+      const remaining = Math.max(0, Math.ceil(minPlaybackMs - elapsed));
+      addLog(`⏱️ Holding stage for ${remaining}ms: ${videoId}`);
+      setTimeout(() => {
+        if (endedDispatched) return;
+        endedDispatched = true;
+        onEnded();
+      }, remaining);
+      return;
+    }
+
+    endedDispatched = true;
     onEnded();
   };
 
@@ -303,7 +320,7 @@ const handleInteraction = () => {
       transitionToVideo('video4', () => {
         STATE.currentStage = 'video5';
         updateStageDisplay('video5');
-        transitionToVideo('video5', () => startLoop6(), false, { minReadyState: 3, timeoutMs: 6000 });
+        transitionToVideo('video5', () => startLoop6(), false, { minReadyState: 3, timeoutMs: 6000, minPlaybackMs: 1500 });
       }, false);
       break;
   }
