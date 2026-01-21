@@ -6,10 +6,10 @@ It can also select the video set via a QR-code friendly query parameter: `?show=
 
 ## How it works
 
-- The client requests videos as `/1.mp4` … `/7.mp4`.
+- The client requests videos as `/1.mp4` … `/6.mp4`.
 - The server looks at the request host (e.g. `leibniz.example.com`).
 - If the subdomain matches a folder inside `assets/` (case-insensitive), videos are served from that folder:
-   - `leibniz.*` → `assets/LEIBNIZ/1.mp4` … `assets/LEIBNIZ/7.mp4`
+   - `leibniz.*` → `assets/LEIBNIZ/1.mp4` … `assets/LEIBNIZ/6.mp4`
   - `niki.*` → `assets/NIKI/...`
   - `pferde.*` → `assets/PFERDE/...`
 
@@ -22,9 +22,9 @@ When a user opens a link like:
 - `https://<your-app-domain>/?show=niki`
 - `https://<your-app-domain>/?show=leibniz`
 
-the server stores that selection in a cookie (`show=<FOLDER>`). That way the page can keep requesting videos as `/1.mp4` … `/7.mp4` and the server still knows which `assets/<FOLDER>/` to use.
+the server stores that selection in a cookie (`show=<FOLDER>`). That way the page can keep requesting videos as `/1.mp4` … `/6.mp4` and the server still knows which `assets/<FOLDER>/` to use.
 
-Selection priority when serving `/1.mp4`…`/7.mp4`:
+Selection priority when serving `/1.mp4`…`/6.mp4`:
 
 1. `?show=<key>` on the video request (if present)
 2. Cookie `show=<key>`

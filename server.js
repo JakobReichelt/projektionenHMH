@@ -131,7 +131,7 @@ const getRequestedAssetsFolder = (req) => {
 app.use(express.json());
 
 // Persist ?show=<assets-folder> selection via cookie so the static page can load
-// /1.mp4 ... /7.mp4 without needing to append query parameters on every request.
+// /1.mp4 ... /6.mp4 without needing to append query parameters on every request.
 app.use((req, res, next) => {
   const showParam = req?.query?.[SHOW_QUERY_PARAM];
   if (showParam !== undefined) {
@@ -154,7 +154,7 @@ app.use(express.static('public'));
 
 // Serve background videos based on subdomain.
 // Requests like /1.mp4 are mapped to assets/<SUBDOMAIN>/1.mp4 when such a folder exists.
-app.get(/^\/(?:[1-7])\.mp4$/, (req, res, next) => {
+app.get(/^\/(?:[1-6])\.mp4$/, (req, res, next) => {
   const requestedFile = req.path.slice(1);
 
   const candidateFolders = [];

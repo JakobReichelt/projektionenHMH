@@ -9,8 +9,7 @@ const CONFIG = {
     { id: 'video3-looping', title: '', text: '' },
     { id: 'video4', title: '', text: '' },
     { id: 'video5', title: '', text: '' },
-    { id: 'video6-looping', title: '', text: '' },
-    { id: 'video7', title: '', text: '' }
+    { id: 'video6-looping', title: '', text: '' }
   ],
 
   // WebSocket configuration

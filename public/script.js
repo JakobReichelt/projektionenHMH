@@ -8,7 +8,6 @@ const STATE = {
   iosInitiated: false,
   videos: {},
   isIOS: CONFIG.isIOS(),
-  loop6TimeoutId: null,
   activeVideoId: null,
   debug: {
     uiFps: null,
@@ -32,8 +31,7 @@ const initVideos = () => {
     video3: document.getElementById('video3'),
     video4: document.getElementById('video4'),
     video5: document.getElementById('video5'),
-    video6: document.getElementById('video6'),
-    video7: document.getElementById('video7')
+    video6: document.getElementById('video6')
   };
 };
 
@@ -165,11 +163,6 @@ const transitionToVideo = async (videoId, onEnded = null, isLooping = false, opt
     logWait = true
   } = options;
 
-  if (STATE.loop6TimeoutId) {
-    clearTimeout(STATE.loop6TimeoutId);
-    STATE.loop6TimeoutId = null;
-  }
-
   const prevId = STATE.activeVideoId;
   const prevVideo = prevId ? STATE.videos[prevId] : null;
 
@@ -234,7 +227,7 @@ const initializeVideoSequence = () => {
   preloadVideoSource('video1');
   preloadVideoSource('video2');
 
-  // 1 -> 2 -> loop 3 (wait interaction) -> 4 -> 5 -> loop 6 for 3s -> 7
+  // 1 -> 2 -> loop 3 (wait interaction) -> 4 -> 5 -> loop 6 (end)
   transitionToVideo('video1', () => {
     STATE.currentStage = 'video2';
     updateStageDisplay('video2');
@@ -251,20 +244,12 @@ const initializeVideoSequence = () => {
   }, false);
 };
 
-const startTimedLoop6Then7 = (ms) => {
+const startLoop6 = () => {
   preloadVideoSource('video6');
-  preloadVideoSource('video7');
   transitionToVideo('video6', null, true);
   STATE.currentStage = 'video6-looping';
   updateStageDisplay('video6-looping');
   STATE.allowInteraction = false;
-
-  STATE.loop6TimeoutId = setTimeout(() => {
-    STATE.loop6TimeoutId = null;
-    STATE.currentStage = 'video7';
-    updateStageDisplay('video7');
-    transitionToVideo('video7', null, false);
-  }, ms);
 };
 
 // ===== INTERACTION HANDLING =====
@@ -284,14 +269,14 @@ const handleInteraction = () => {
         STATE.ws.send('2');
       }
 
-      // Interaction during looping 3 triggers 4 -> 5 -> loop 6 for 3s -> 7
+      // Interaction during looping 3 triggers 4 -> 5 -> loop 6 (end)
       STATE.currentStage = 'video4';
       updateStageDisplay('video4');
       preloadVideoSource('video5');
       transitionToVideo('video4', () => {
         STATE.currentStage = 'video5';
         updateStageDisplay('video5');
-        transitionToVideo('video5', () => startTimedLoop6Then7(3000), false, { minReadyState: 3, timeoutMs: 6000 });
+        transitionToVideo('video5', () => startLoop6(), false, { minReadyState: 3, timeoutMs: 6000 });
       }, false);
       break;
   }

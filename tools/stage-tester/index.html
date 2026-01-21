@@ -171,7 +171,7 @@
             <button class="tester-btn" id="btnPrev">← Prev Stage</button>
             <button class="tester-btn" id="btnNext">Next Stage →</button>
             <button class="tester-btn" id="btnReset">Reset to video1</button>
-            <button class="tester-btn" id="btnRunLiveFlow" title="Simulates: 1 → 2 → 3(loop) → (interaction) → 4 → 5 → 6(loop 3s) → 7">Run Live Flow</button>
+            <button class="tester-btn" id="btnRunLiveFlow" title="Simulates: 1 → 2 → 3(loop) → (interaction) → 4 → 5 → 6(loop)">Run Live Flow</button>
         </div>
 
         <div class="tester-row">
@@ -188,8 +188,7 @@
             ws: null,
             currentIndex: 0,
             currentStageId: CONFIG.stages?.[0]?.id || 'video1',
-            hasInteracted: false,
-            loop6TimeoutId: null
+            hasInteracted: false
         };
 
         const els = {
@@ -306,11 +305,6 @@
             STATE.currentStageId = stageId;
             els.currentStageId.textContent = stageId;
 
-            if (STATE.loop6TimeoutId) {
-                clearTimeout(STATE.loop6TimeoutId);
-                STATE.loop6TimeoutId = null;
-            }
-
             const stage = CONFIG.getStage(stageId);
             els.stageTitle.textContent = stage?.title || '';
             els.stageText.textContent = stage?.text || '';
@@ -353,15 +347,6 @@
             addLog('ℹ️ Already at first stage');
         };
 
-        const startTimedLoop6Then7 = (ms) => {
-            setStage('video6-looping');
-            STATE.loop6TimeoutId = setTimeout(() => {
-                STATE.loop6TimeoutId = null;
-                setStage('video7');
-                addLog('⏱️ Auto-advanced: video6-looping → video7');
-            }, ms);
-        };
-
         const handleInteraction = () => {
             if (STATE.hasInteracted) return;
             if (STATE.currentStageId !== 'video3-looping') return;
@@ -372,11 +357,11 @@
             // Live client: interaction during video3-looping sends "2"
             sendWs('2');
 
-            // Then: 4 → 5 → loop 6 for 3s → 7
+            // Then: 4 → 5 → loop 6
             // Stage tester has no video timings, so we step quickly but keep IDs accurate.
             setStage('video4');
             setTimeout(() => setStage('video5'), 250);
-            setTimeout(() => startTimedLoop6Then7(3000), 500);
+            setTimeout(() => setStage('video6-looping'), 500);
         };
 
         const resetFlow = () => {
