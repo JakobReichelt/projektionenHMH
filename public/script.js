@@ -61,15 +61,39 @@ class VideoPlayer {
     });
   }
 
-  // Preload ALL videos - fetch and cache as blobs for instant playback
+  // Preload videos - smart strategy based on device
   async preloadAllVideos() {
     if (this.isPreloading) return;
     this.isPreloading = true;
     
-    log('🔄 Preloading all videos into memory...');
+    const isMobile = state.isIOS || /Android/i.test(navigator.userAgent);
+    
+    log(`🔄 Preloading videos (${isMobile ? 'mobile mode' : 'desktop mode'})...`);
     
     const videoOrder = ['video1', 'video2', 'video3-looping', 'video4', 'video5', 'video6-looping'];
     
+    // On mobile: Don't use blob caching (causes memory issues and slow loading)
+    // Instead, rely on browser's HTTP cache with preload hints
+    if (isMobile) {
+      log('📱 Mobile - using lightweight preload strategy');
+      
+      for (const videoId of videoOrder) {
+        const videoPath = VIDEO_PATHS[videoId];
+        
+        // Just mark with direct path - let browser handle caching
+        this.videoCache.set(videoId, videoPath);
+        
+        // Trigger browser cache with HEAD request (lightweight)
+        fetch(videoPath, { method: 'HEAD' }).catch(() => {});
+        log(`✓ Registered: ${videoId}`);
+      }
+      
+      log('✅ Mobile preload complete');
+      this.isPreloading = false;
+      return;
+    }
+    
+    // Desktop: Use blob caching for instant playback
     for (const videoId of videoOrder) {
       const videoPath = VIDEO_PATHS[videoId];
       
@@ -84,7 +108,6 @@ class VideoPlayer {
       } catch (error) {
         console.error(`Failed to preload ${videoId}:`, error);
         log(`❌ Failed: ${videoId}`);
-        // Fallback to direct path
         this.videoCache.set(videoId, videoPath);
       }
     }
@@ -419,9 +442,8 @@ window.addEventListener('load', async () => {
   // Connect WebSocket
   connectWebSocket();
 
-  // Preload ALL videos FIRST before allowing playback
-  log('⏳ Waiting for videos to cache...');
-  await videoPlayer.preloadAllVideos().catch(err => {
+  // Start preloading in background (non-blocking)
+  videoPlayer.preloadAllVideos().catch(err => {
     console.error('Preload error:', err);
   });
 
@@ -430,7 +452,7 @@ window.addEventListener('load', async () => {
     showStartOverlay();
     log('iOS detected - tap to start');
   } else {
-    // Desktop: Try autoplay after all videos are cached
+    // Desktop: Try autoplay immediately
     log('Desktop - attempting autoplay');
     videoPlayer.loadAndPlay('video1').catch(() => {
       log('Autoplay blocked - showing overlay');
