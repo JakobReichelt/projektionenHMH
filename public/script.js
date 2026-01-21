@@ -278,12 +278,14 @@ function sendMessage(msg) {
 // ============================================
 
 function handleInteraction() {
+  log(`Interaction - hasInteracted: ${state.hasInteracted}, currentStage: ${state.currentStage}`);
+  
   // First interaction - hide overlay and start playback
   if (!state.hasInteracted) {
     hideStartOverlay();
     state.hasInteracted = true;
     
-    log('First interaction - starting video1');
+    log('✋ First interaction - starting video1');
     
     // Force video1 to start on first interaction
     // This is critical for iOS which requires user gesture
@@ -297,8 +299,11 @@ function handleInteraction() {
 
   // Stage-specific interactions
   if (state.currentStage === 'video3-looping') {
+    log('✋ Video 3 interaction - switching to video 4');
     sendMessage('2'); // Notify server
     videoPlayer.loadAndPlay('video4');
+  } else {
+    log(`ℹ️ Interaction ignored - not in interactive stage (current: ${state.currentStage})`);
   }
 }
 
