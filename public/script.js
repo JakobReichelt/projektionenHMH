@@ -154,6 +154,11 @@ class VideoPlayer {
     try {
       await this.pending.play();
       this.hasStartedPlayback = true; // Mark that playback has started
+      
+      // Send "1" to server when video 1 starts playing
+      if (stageId === 'video1') {
+        sendMessage('1');
+      }
     } catch (error) {
       if (error.name === 'NotAllowedError') {
         log('⚠️ Autoplay blocked - showing interaction prompt');
