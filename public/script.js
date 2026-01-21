@@ -136,7 +136,11 @@ class VideoManager {
             if (this.inactiveLayer === prevLayer) { // Ensure ownership hasn't changed
                 prevLayer.pause();
                 prevLayer.currentTime = 0;
-                prevLayer.src = ""; // Unload memory
+                // Only clear if it actually has a src to avoid "Invalid URI" errors
+                if (prevLayer.hasAttribute('src')) {
+                    prevLayer.removeAttribute('src');
+                    prevLayer.load();
+                }
             }
         }, 600); // slightly longer than CSS transition
 
