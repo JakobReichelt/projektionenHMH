@@ -26,7 +26,8 @@ const state = {
   hasInteracted: false,
   isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent),
   activeVideo: null,
-  pendingVideo: null
+  pendingVideo: null,
+  messageQueue: [] // Queue messages to send when WS connects
 };
 
 // ============================================
@@ -260,6 +261,13 @@ function connectWebSocket() {
   state.ws.onopen = () => {
     log('✓ Connected');
     updateConnectionStatus(true);
+    
+    // Send any queued messages
+    while (state.messageQueue.length > 0) {
+      const msg = state.messageQueue.shift();
+      state.ws.send(msg);
+      log(`→ ${msg} (from queue)`);
+    }
   };
 
   state.ws.onclose = () => {
@@ -295,6 +303,9 @@ function sendMessage(msg) {
   if (state.ws && state.ws.readyState === WebSocket.OPEN) {
     state.ws.send(msg);
     log(`→ ${msg}`);
+  } else {
+    log(`⚠️ WebSocket not ready - queuing message: '${msg}'`);
+    state.messageQueue.push(msg);
   }
 }
 
