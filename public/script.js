@@ -39,6 +39,8 @@ class VideoPlayer {
     this.video2 = document.getElementById('video-layer-2');
     this.active = this.video1;
     this.pending = this.video2;
+    this.preloadCache = new Map(); // Track preloaded videos
+    this.isPreloading = false;
     
     this.setupEventListeners();
   }
@@ -48,7 +50,51 @@ class VideoPlayer {
       video.addEventListener('ended', () => this.onVideoEnded(video));
       video.addEventListener('error', (e) => this.onVideoError(video, e));
       video.addEventListener('canplay', () => log(`✓ Video ready: ${video.dataset.stage || 'unknown'}`));
+      video.addEventListener('loadeddata', () => {
+        const stage = video.dataset.preload || video.dataset.stage;
+        if (stage) this.preloadCache.set(stage, true);
+      });
     });
+  }
+
+  // Preload ALL videos on page load to eliminate lag
+  async preloadAllVideos() {
+    if (this.isPreloading) return;
+    this.isPreloading = true;
+    
+    log('🔄 Preloading all videos...');
+    
+    const videoIds = Object.keys(VIDEO_PATHS);
+    const preloadPromises = [];
+    
+    for (const videoId of videoIds) {
+      const videoPath = VIDEO_PATHS[videoId];
+      const promise = new Promise((resolve) => {
+        const tempVideo = document.createElement('video');
+        tempVideo.preload = 'auto';
+        tempVideo.src = videoPath;
+        tempVideo.dataset.preload = videoId;
+        
+        tempVideo.addEventListener('loadeddata', () => {
+          log(`✓ Preloaded: ${videoId}`);
+          this.preloadCache.set(videoId, true);
+          resolve();
+        }, { once: true });
+        
+        tempVideo.addEventListener('error', () => {
+          log(`⚠️ Preload failed: ${videoId}`);
+          resolve(); // Don't block on errors
+        }, { once: true });
+        
+        tempVideo.load();
+      });
+      
+      preloadPromises.push(promise);
+    }
+    
+    await Promise.all(preloadPromises);
+    log('✅ All videos preloaded');
+    this.isPreloading = false;
   }
 
   async loadAndPlay(stageId) {
@@ -60,16 +106,20 @@ class VideoPlayer {
       return false;
     }
 
-    log(`Loading: ${stageId}`);
+    log(`▶️ Playing: ${stageId}`);
     
     // Prepare pending video
     this.pending.loop = config.loop;
     this.pending.dataset.stage = stageId;
     
     // Load video if different source
-    if (this.pending.src !== window.location.origin + videoPath) {
+    const fullPath = window.location.origin + videoPath;
+    if (this.pending.src !== fullPath) {
       this.pending.src = videoPath;
       this.pending.load();
+    } else {
+      // Video already loaded, just restart if needed
+      this.pending.currentTime = 0;
     }
 
     // Wait for video to be ready
@@ -94,11 +144,6 @@ class VideoPlayer {
     state.currentStage = stageId;
     state.activeVideo = this.active;
     updateDebugInfo();
-
-    // Preload next video if applicable
-    if (config.next) {
-      this.preloadNext(config.next);
-    }
 
     return true;
   }
@@ -128,15 +173,6 @@ class VideoPlayer {
       this.pending.pause();
       this.pending.currentTime = 0;
     }, 500);
-  }
-
-  preloadNext(stageId) {
-    const videoPath = VIDEO_PATHS[stageId];
-    if (!videoPath) return;
-    
-    log(`Preloading: ${stageId}`);
-    this.pending.src = videoPath;
-    this.pending.load();
   }
 
   onVideoEnded(video) {
@@ -332,7 +368,7 @@ document.addEventListener('keydown', (e) => {
 // INITIALIZATION
 // ============================================
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   log('Initializing...');
   
   // Create video player
@@ -341,6 +377,11 @@ window.addEventListener('load', () => {
 
   // Connect WebSocket
   connectWebSocket();
+
+  // Start preloading ALL videos immediately (non-blocking)
+  videoPlayer.preloadAllVideos().catch(err => {
+    console.error('Preload error:', err);
+  });
 
   // Try autoplay
   videoPlayer.loadAndPlay('video1').catch(() => {

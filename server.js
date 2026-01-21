@@ -33,21 +33,46 @@ const DEFAULT_FOLDER = getDefaultFolder();
 app.use(express.json());
 app.use(express.static('public'));
 
-// Serve video files from default or specified folder
+// Serve video files with range request support for better streaming
 app.get(/^\/[1-6]\.mp4$/, (req, res, next) => {
-  const videoFile = req.path.slice(1); // e.g., "1.mp4"
+  const videoFile = req.path.slice(1);
   const show = req.query.show || DEFAULT_FOLDER;
   
   if (!show) return next();
   
   const filePath = path.join(ASSETS_DIR, show, videoFile);
   
-  if (fs.existsSync(filePath)) {
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.sendFile(filePath);
-  }
+  if (!fs.existsSync(filePath)) return next();
   
-  next();
+  const stat = fs.statSync(filePath);
+  const fileSize = stat.size;
+  const range = req.headers.range;
+  
+  // Set aggressive caching (7 days)
+  res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+  res.setHeader('Accept-Ranges', 'bytes');
+  
+  if (range) {
+    // Handle range requests for video seeking
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+    const chunkSize = (end - start) + 1;
+    
+    res.status(206);
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+    res.setHeader('Content-Length', chunkSize);
+    res.setHeader('Content-Type', 'video/mp4');
+    
+    const stream = fs.createReadStream(filePath, { start, end });
+    stream.pipe(res);
+  } else {
+    // Send entire file
+    res.setHeader('Content-Length', fileSize);
+    res.setHeader('Content-Type', 'video/mp4');
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+  }
 });
 
 // Fallback: direct access to asset folders
