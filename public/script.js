@@ -8,6 +8,7 @@ const STATE = {
   iosInitiated: false,
   videos: {},
   isIOS: CONFIG.isIOS(),
+  isIPhone: typeof CONFIG.isIPhone === 'function' ? CONFIG.isIPhone() : /iPhone/.test(navigator.userAgent),
   activeVideoId: null,
   debug: {
     uiFps: null,
@@ -296,8 +297,27 @@ const startLoop6 = () => {
   STATE.allowInteraction = false;
 };
 
+// ===== iPhone START OVERLAY =====
+const getStartOverlay = () => document.getElementById('startOverlay');
+
+const showStartOverlay = () => {
+  const overlay = getStartOverlay();
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+};
+
+const hideStartOverlay = () => {
+  const overlay = getStartOverlay();
+  if (!overlay) return;
+  overlay.classList.add('hidden');
+};
+
 // ===== INTERACTION HANDLING =====
 const handleInteraction = () => {
+  if (STATE.isIPhone && !STATE.iosInitiated) {
+    hideStartOverlay();
+  }
+
   if (STATE.isIOS && !STATE.iosInitiated) {
     STATE.iosInitiated = true;
     initializeVideoSequence();
@@ -652,6 +672,21 @@ const sendButton = (buttonName) => {
 window.addEventListener('load', () => {
   initVideos();
   connectWebSocket();
+
+  // iPhone Safari requires a user gesture to start video playback.
+  // Keep WS registration at signal '1' (sent on connect) until the first tap.
+  if (STATE.isIPhone) {
+    showStartOverlay();
+    const overlay = getStartOverlay();
+    overlay?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleInteraction();
+      }
+    });
+  } else {
+    hideStartOverlay();
+  }
 
   document.getElementById('clearLogBtn')?.addEventListener('click', clearLog);
   startFpsMonitor();

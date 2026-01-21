@@ -21,6 +21,9 @@ const CONFIG = {
   // Device detection
   isIOS: () => /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
 
+  // iPhone-specific detection (used for autoplay/gesture fallback UI)
+  isIPhone: () => /iPhone/.test(navigator.userAgent) && !window.MSStream,
+
   // Get stage by ID
   getStage: (stageId) => CONFIG.stages.find(s => s.id === stageId),
 
