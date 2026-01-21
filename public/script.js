@@ -199,9 +199,17 @@ class VideoPlayer {
     const stageId = video.dataset.stage;
     const config = STAGE_FLOW[stageId];
     
-    log(`Video ended: ${stageId}`);
+    log(`📹 Video ended: ${stageId}, loop: ${config?.loop}`);
     
+    // Don't advance if this is a looping video - it should loop automatically
+    if (config && config.loop) {
+      log(`🔄 Video ${stageId} is looping - not advancing`);
+      return;
+    }
+    
+    // Only advance to next stage if there is one and it's not looping
     if (config && config.next) {
+      log(`⏭️ Advancing to: ${config.next}`);
       this.loadAndPlay(config.next);
     }
   }
