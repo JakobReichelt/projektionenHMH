@@ -54,11 +54,15 @@ class VideoPlayer {
     [this.video1, this.video2].forEach(video => {
       video.addEventListener('ended', () => this.onVideoEnded(video));
       video.addEventListener('error', (e) => this.onVideoError(video, e));
-      video.addEventListener('canplay', () => log(`✓ Video ready: ${video.dataset.stage || 'unknown'}`));
-      video.addEventListener('loadeddata', () => {
-        const stage = video.dataset.preload || video.dataset.stage;
-        if (stage) this.preloadCache.set(stage, true);
-      });
+      video.addEventListener('canplay', () => {
+        const stage = video.dataset.stage || video.dataset.preload;
+        if (stage) {
+          log(`✓ Video ready: ${stage}`);
+          this.preloadCache.set(stage, true);
+        }
+      }, { once: true }); // Only log once per video load
+      
+      // Don't log waiting/buffering events - they spam mobile logs
     });
   }
 
@@ -124,6 +128,7 @@ class VideoPlayer {
     // Prepare pending video
     this.pending.loop = config.loop;
     this.pending.dataset.stage = stageId;
+    this.pending.preload = 'auto'; // Ensure preload attribute is set
     
     // Load video if different source
     const fullPath = window.location.origin + videoPath;
