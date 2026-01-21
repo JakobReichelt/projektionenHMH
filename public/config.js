@@ -1,8 +1,10 @@
 /**
- * Shared configuration for all client-side scripts
+ * Application Configuration
+ * Defines stages and video flow for the interactive experience
  */
+
 const CONFIG = {
-  // Stage content configuration
+  // Stage definitions with titles and text content
   stages: [
     { id: 'video1', title: '', text: '' },
     { id: 'video2', title: '', text: '' },
@@ -12,33 +14,9 @@ const CONFIG = {
     { id: 'video6-looping', title: '', text: '' }
   ],
 
-  // WebSocket configuration
+  // WebSocket reconnection settings
   reconnect: {
     maxAttempts: 5,
     delayMs: 3000
-  },
-
-  // Device detection
-  isIOS: () => /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
-
-  // iPhone-specific detection (used for autoplay/gesture fallback UI)
-  isIPhone: () => /iPhone/.test(navigator.userAgent) && !window.MSStream,
-
-  // Get stage by ID
-  getStage: (stageId) => CONFIG.stages.find(s => s.id === stageId),
-
-  // Get stage index
-  getStageIndex: (stageId) => CONFIG.stages.findIndex(s => s.id === stageId),
-
-  // Get next stage
-  getNextStage: (currentId) => {
-    const idx = CONFIG.getStageIndex(currentId);
-    return idx < CONFIG.stages.length - 1 ? CONFIG.stages[idx + 1] : null;
-  },
-
-  // Get previous stage
-  getPrevStage: (currentId) => {
-    const idx = CONFIG.getStageIndex(currentId);
-    return idx > 0 ? CONFIG.stages[idx - 1] : null;
   }
 };

@@ -2,57 +2,43 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Interactive Video Experience</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Video Container with Double Buffer -->
     <div class="video-container">
-        <!-- Double Buffer System for smooth transitions -->
-        <video class="background-video" id="video-layer-1" playsinline webkit-playsinline muted></video>
-        <video class="background-video" id="video-layer-2" playsinline webkit-playsinline muted></video>
+        <video class="video-layer" id="video-layer-1" playsinline muted></video>
+        <video class="video-layer" id="video-layer-2" playsinline muted></video>
     </div>
 
-    <div class="start-overlay hidden" id="startOverlay" role="button" aria-label="Berühre um zu beginnen" tabindex="0">
-        <div class="start-overlay-text">berühre um zu beginnen</div>
+    <!-- Start Overlay for Mobile Autoplay -->
+    <div class="start-overlay hidden" id="startOverlay">
+        <div class="start-text">Tap to Begin</div>
     </div>
 
-    <div class="stage-title" id="stageTitle"></div>
-    
-    <div class="stage-display">
-        <div class="stage-text" id="stageText"></div>
-    </div>
+    <!-- Debug Toggle Button -->
+    <button class="debug-toggle" onclick="toggleDebugPanel()" aria-label="Toggle Debug Panel">🔧</button>
 
-    <button class="debug-toggle" onclick="toggleDebugPanel()">🔧</button>
-
+    <!-- Debug Panel -->
     <div class="debug-panel" id="debugPanel">
-        <div class="debug-panel-title">Debug Menu</div>
+        <div class="debug-header">Debug Panel</div>
 
-        <div class="debug-actions">
-            <button class="debug-action" id="clearLogBtn" type="button">Clear log</button>
-        </div>
+        <button class="debug-btn" id="clearLogBtn">Clear Log</button>
 
         <div class="debug-metrics">
-            <div class="metric-row"><span class="metric-label">Stage</span><span id="debugStage">-</span></div>
-            <div class="metric-row"><span class="metric-label">Video</span><span id="debugVideo">-</span></div>
-            <div class="metric-row"><span class="metric-label">UI FPS</span><span id="debugUiFps">-</span></div>
-            <div class="metric-row"><span class="metric-label">Video FPS</span><span id="debugVideoFps">-</span></div>
-            <div class="metric-row"><span class="metric-label">Drops/s</span><span id="debugDropsPerSec">-</span></div>
-            <div class="metric-row"><span class="metric-label">State</span><span id="debugStates">-</span></div>
-            <div class="metric-row"><span class="metric-label">Frames</span><span id="debugFrames">-</span></div>
+            <div class="metric"><span>Stage:</span><span id="debugStage">-</span></div>
+            <div class="metric"><span>Video:</span><span id="debugVideo">-</span></div>
+            <div class="metric"><span>UI FPS:</span><span id="debugUiFps">-</span></div>
+            <div class="metric"><span>State:</span><span id="debugStates">-</span></div>
         </div>
         
-        <div class="status disconnected" id="status">
-            Status: <span id="statusText">Disconnected</span>
+        <div class="connection-status disconnected" id="status">
+            <span id="statusText">Disconnected</span>
         </div>
 
-        <div class="feedback" id="feedback">
-            Waiting for input...
-        </div>
-
-        <div class="message-log" id="messageLog">
-            <div class="log-entry">Initializing connection...</div>
-        </div>
+        <div class="message-log" id="messageLog"></div>
     </div>
 
     <script src="config.js"></script>

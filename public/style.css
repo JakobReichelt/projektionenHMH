@@ -1,3 +1,7 @@
+/* ============================================
+   RESET & BASE
+   ============================================ */
+
 * {
     margin: 0;
     padding: 0;
@@ -5,372 +9,256 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
     min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     overflow: hidden;
-    position: relative;
-    background: black;
+    background: #000;
+    color: white;
 }
 
 .hidden {
     display: none !important;
 }
 
-/* Hide stage text UI (videos only), but keep debug menu available */
-.stage-title,
-.stage-display {
-    display: none !important;
-}
+/* ============================================
+   VIDEO CONTAINER
+   ============================================ */
 
-/* ===== VIDEO CONTAINER ===== */
 .video-container {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100vw;
     height: 100vh;
     height: 100dvh;
-    z-index: -1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     overflow: hidden;
+    z-index: 0;
 }
 
-.background-video {
+.video-layer {
     position: absolute;
     inset: 0;
     width: 100%;
-    height: 100vh;
-    height: 100dvh;
+    height: 100%;
     object-fit: cover;
     opacity: 0;
-    transition: opacity 0.4s ease-out;
-    z-index: 1;
+    transition: opacity 0.5s ease-in-out;
+    will-change: opacity;
 }
 
-.background-video.active {
+.video-layer.active {
     opacity: 1;
-    z-index: 2;
 }
 
-/* ===== iPhone autoplay fallback overlay ===== */
+/* ============================================
+   START OVERLAY
+   ============================================ */
+
 .start-overlay {
     position: fixed;
     inset: 0;
     display: flex;
-    justify-content: center;
     align-items: center;
-    z-index: 150;
-    background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: manipulation;
-}
-
-.start-overlay-text {
-    color: white;
-    font-size: clamp(20px, 4vw, 44px);
-    letter-spacing: 0.04em;
-    text-transform: lowercase;
-    padding: 20px 28px;
-    border: 1px solid rgba(255, 255, 255, 0.65);
-    border-radius: 14px;
-    background: rgba(0, 0, 0, 0.35);
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
-}
-
-/* ===== STAGE DISPLAY ===== */
-.stage-display {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    z-index: 5;
-    max-width: 400px;
-    padding: 30px;
-    pointer-events: none;
-}
-
-.stage-display.interactive {
-    pointer-events: auto;
-}
-
-.stage-title {
-    position: fixed;
-    top: 150px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 400px;
-    padding: 0 30px;
-    font-size: 1.8em;
-    font-weight: bold;
-    color: white;
-    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
-    letter-spacing: 2px;
-    text-align: center;
-}
-
-.stage-text {
-    font-size: 1.5em;
-    color: white;
-    text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
-    line-height: 1.6;
-    font-weight: 300;
-}
-
-.stage-text.interactive {
-    cursor: pointer;
-    transition: opacity 0.3s ease;
-    text-decoration: underline;
-}
-
-.stage-text.interactive:hover {
-    opacity: 0.8;
-}
-
-.stage-text.interactive:active {
-    opacity: 0.6;
-}
-
-.stage-text.black-text,
-.stage-title.black-text {
-    color: black !important;
-    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8) !important;
-}
-
-/* ===== BUTTONS ===== */
-.main-button {
-    width: 200px;
-    height: 200px;
+    justify-content: center;
     background: rgba(0, 0, 0, 0.7);
-    border: 2px solid white;
-    border-radius: 50%;
+    backdrop-filter: blur(4px);
+    z-index: 100;
     cursor: pointer;
-    font-size: 1.2em;
-    color: white;
-    font-weight: bold;
+    user-select: none;
+}
+
+.start-text {
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-weight: 300;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 1.5rem 3rem;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.3);
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.3);
-    position: relative;
-    z-index: 10;
 }
 
-.main-button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.5);
-    background: rgba(0, 0, 0, 0.9);
+.start-overlay:hover .start-text {
+    border-color: white;
+    background: rgba(0, 0, 0, 0.5);
 }
 
-.main-button:active {
-    transform: scale(0.95);
-}
+/* ============================================
+   DEBUG PANEL
+   ============================================ */
 
-@keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.7); }
-    70% { box-shadow: 0 0 0 30px rgba(0, 0, 0, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
-}
-
-.main-button.pulse {
-    animation: pulse 0.6s ease;
-}
-
-/* ===== DEBUG PANEL ===== */
 .debug-toggle {
     position: fixed;
     bottom: 20px;
     left: 20px;
     width: 50px;
     height: 50px;
-    background: black;
-    border: 2px solid white;
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid rgba(255, 255, 255, 0.6);
     border-radius: 50%;
-    cursor: pointer;
-    font-size: 1.5em;
+    font-size: 1.5rem;
     color: white;
+    cursor: pointer;
+    z-index: 90;
+    transition: all 0.2s ease;
     display: flex;
-    justify-content: center;
     align-items: center;
-    z-index: 100;
-    transition: all 0.3s ease;
+    justify-content: center;
 }
 
 .debug-toggle:hover {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: white;
     transform: scale(1.1);
-    background: white;
-    color: black;
 }
 
 .debug-panel {
     position: fixed;
     bottom: 80px;
     left: 20px;
-    background: rgba(0, 0, 0, 0.9);
-    border: 2px solid white;
-    border-radius: 10px;
-    padding: 15px;
-    max-width: 400px;
-    max-height: 400px;
-    overflow-y: auto;
+    width: 400px;
+    max-height: 500px;
+    background: rgba(0, 0, 0, 0.95);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    z-index: 89;
     display: none;
-    z-index: 99;
-    color: white;
+    overflow-y: auto;
     font-family: 'Courier New', monospace;
-    font-size: 0.85em;
+    font-size: 0.85rem;
 }
 
 .debug-panel.show {
     display: block;
 }
 
-.debug-panel-title {
+.debug-header {
     font-weight: bold;
-    margin-bottom: 10px;
-    border-bottom: 1px solid white;
-    padding-bottom: 5px;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.debug-actions {
-    display: flex;
-    gap: 8px;
-    margin: 10px 0;
-}
-
-.debug-action {
-    background: transparent;
+.debug-btn {
+    background: rgba(255, 255, 255, 0.1);
     color: white;
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    border-radius: 6px;
-    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
     cursor: pointer;
-    font-family: inherit;
-    font-size: 0.9em;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
 }
 
-.debug-action:hover {
+.debug-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
     border-color: white;
 }
 
 .debug-metrics {
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 8px;
-    padding: 10px;
-    margin: 10px 0;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
 }
 
-.metric-row {
+.metric {
     display: flex;
     justify-content: space-between;
-    gap: 10px;
-    padding: 2px 0;
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
 }
 
-.metric-label {
-    opacity: 0.85;
+.metric span:first-child {
+    opacity: 0.7;
 }
 
-.status {
-    margin-bottom: 10px;
+.connection-status {
+    padding: 0.5rem;
+    border-radius: 4px;
+    text-align: center;
     font-weight: bold;
+    margin-bottom: 1rem;
 }
 
-.status.connected {
-    color: #00ff00;
+.connection-status.connected {
+    background: rgba(0, 255, 0, 0.2);
+    color: #0f0;
 }
 
-.status.disconnected {
-    color: #ff0000;
-}
-
-.feedback {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid white;
-    color: #00ff00;
+.connection-status.disconnected {
+    background: rgba(255, 0, 0, 0.2);
+    color: #f00;
 }
 
 .message-log {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid white;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 0.5rem;
     max-height: 200px;
     overflow-y: auto;
-    color: #00ff00;
+    font-size: 0.75rem;
 }
 
 .log-entry {
-    padding: 3px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0;
+    color: #0f0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* ===== RESPONSIVE DESIGN ===== */
-@media (max-width: 667px) {
-    .video-container {
-        height: 100vh;
-        height: 100dvh;
-    }
+.log-entry:last-child {
+    border-bottom: none;
+}
 
-    .background-video {
-        width: 100vw;
-        height: 100vh;
-        height: 100dvh;
-        object-fit: fill;
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 768px) {
+    .debug-panel {
+        width: calc(100vw - 40px);
+        max-width: 400px;
+        max-height: 40vh;
     }
 
     .debug-toggle {
-        bottom: 15px;
-        left: 15px;
         width: 45px;
         height: 45px;
-        font-size: 1.2em;
-    }
-
-    .debug-panel {
-        bottom: 70px;
-        left: 15px;
-        right: 15px;
-        max-width: none;
-        width: calc(100% - 30px);
-        max-height: 35vh;
-        font-size: 0.75em;
-    }
-
-    .main-button {
-        width: 150px;
-        height: 150px;
-        font-size: 1em;
-    }
-
-    .stage-display {
-        max-width: 85%;
-        padding: 20px;
-    }
-
-    .stage-title {
-        font-size: 1.2em;
-        margin-bottom: 15px;
-    }
-
-    .stage-text {
-        font-size: 1em;
+        font-size: 1.3rem;
     }
 }
 
 @media (max-height: 600px) {
-    .main-button {
-        width: 120px;
-        height: 120px;
-    }
-
     .debug-panel {
         max-height: 30vh;
     }
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+
+.debug-panel::-webkit-scrollbar,
+.message-log::-webkit-scrollbar {
+    width: 8px;
+}
+
+.debug-panel::-webkit-scrollbar-track,
+.message-log::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.debug-panel::-webkit-scrollbar-thumb,
+.message-log::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+.debug-panel::-webkit-scrollbar-thumb:hover,
+.message-log::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
