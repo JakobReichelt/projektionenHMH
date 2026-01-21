@@ -435,14 +435,17 @@ window.addEventListener('load', async () => {
     console.error('Preload error:', err);
   });
 
-  // Always show overlay and wait for user interaction
-  // This prevents double-loading video1 and ensures consistent behavior
-  showStartOverlay();
-  
+  // Only show overlay on iOS devices
   if (state.isIOS) {
+    showStartOverlay();
     log('iOS detected - tap to start');
   } else {
-    log('Desktop - tap to start');
+    // Desktop: Try autoplay immediately
+    log('Desktop - attempting autoplay');
+    videoPlayer.loadAndPlay('video1').catch(() => {
+      log('Autoplay blocked - showing overlay');
+      showStartOverlay();
+    });
   }
 
   // Debug FPS counter
