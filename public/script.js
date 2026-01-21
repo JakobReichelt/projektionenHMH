@@ -104,7 +104,12 @@ class VideoPlayer {
     log(`▶️ Playing: ${stageId}`);
     
     // Get cached video URL (blob or fallback path)
-    const cachedUrl = this.videoCache.get(stageId) || VIDEO_PATHS[stageId];
+    const cachedUrl = this.videoCache.get(stageId);
+    const isCached = cachedUrl && cachedUrl.startsWith('blob:');
+    
+    log(`Cache status: ${isCached ? '✓ Using cached blob' : '⚠️ Loading from network'}`);
+    
+    const videoUrl = cachedUrl || VIDEO_PATHS[stageId];
     
     // Prepare pending video
     this.pending.loop = config.loop;
@@ -112,8 +117,8 @@ class VideoPlayer {
     this.pending.preload = 'auto';
     
     // Use cached blob URL for instant playback
-    if (this.pending.src !== cachedUrl) {
-      this.pending.src = cachedUrl;
+    if (this.pending.src !== videoUrl) {
+      this.pending.src = videoUrl;
       this.pending.load();
     } else {
       this.pending.currentTime = 0;
