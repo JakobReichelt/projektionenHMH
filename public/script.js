@@ -69,12 +69,20 @@ class VideoPlayer {
     
     log('🔄 Preloading all videos...');
     
-    const videoIds = Object.keys(VIDEO_PATHS);
-    const preloadPromises = [];
+    // Load in correct order: video1, video2, video3-looping, video4, video5, video6-looping
+    const videoOrder = [
+      'video1',
+      'video2', 
+      'video3-looping',
+      'video4',
+      'video5',
+      'video6-looping'
+    ];
     
-    for (const videoId of videoIds) {
+    // Preload sequentially to ensure proper order
+    for (const videoId of videoOrder) {
       const videoPath = VIDEO_PATHS[videoId];
-      const promise = new Promise((resolve) => {
+      await new Promise((resolve) => {
         const tempVideo = document.createElement('video');
         tempVideo.preload = 'auto';
         tempVideo.src = videoPath;
@@ -91,13 +99,13 @@ class VideoPlayer {
           resolve(); // Don't block on errors
         }, { once: true });
         
+        // Timeout fallback
+        setTimeout(() => resolve(), 5000);
+        
         tempVideo.load();
       });
-      
-      preloadPromises.push(promise);
     }
     
-    await Promise.all(preloadPromises);
     log('✅ All videos preloaded');
     this.isPreloading = false;
   }
@@ -270,23 +278,20 @@ function sendMessage(msg) {
 // ============================================
 
 function handleInteraction() {
-  // First interaction - hide overlay and start playback if needed
+  // First interaction - hide overlay and start playback
   if (!state.hasInteracted) {
     hideStartOverlay();
     state.hasInteracted = true;
     
-    // Only start video1 if it hasn't started yet
-    if (!videoPlayer.hasStartedPlayback) {
-      videoPlayer.loadAndPlay('video1');
-    } else {
-      // Video1 is already playing, just ensure it's playing
-      const active = videoPlayer.active;
-      if (active.paused) {
-        active.play().catch(err => {
-          console.error('Resume play failed:', err);
-        });
-      }
-    }
+    log('First interaction - starting video1');
+    
+    // Force video1 to start on first interaction
+    // This is critical for iOS which requires user gesture
+    videoPlayer.loadAndPlay('video1').catch(err => {
+      console.error('Failed to start video1:', err);
+      log(`❌ Failed to start: ${err.message}`);
+    });
+    
     return;
   }
 
