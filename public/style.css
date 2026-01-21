@@ -39,7 +39,7 @@ body {
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain; /* Fit vertically on desktop, show black bars on sides */
     opacity: 0;
     transition: opacity 0.5s ease-in-out;
     will-change: opacity;
@@ -219,6 +219,11 @@ body {
    ============================================ */
 
 @media (max-width: 768px) {
+    /* Mobile: Fill screen completely */
+    .video-layer {
+        object-fit: cover;
+    }
+    
     .debug-panel {
         width: calc(100vw - 40px);
         max-width: 400px;
