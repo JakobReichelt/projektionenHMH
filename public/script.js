@@ -41,6 +41,11 @@ class VideoPlayer {
     this.pending = this.video2;
     this.preloadCache = new Map(); // Track preloaded videos
     this.isPreloading = false;
+    this.hasStartedPlayback = false; // Track if initial video started
+    
+    // Ensure videos start hidden
+    this.video1.classList.remove('active');
+    this.video2.classList.remove('active');
     
     this.setupEventListeners();
   }
@@ -128,6 +133,7 @@ class VideoPlayer {
     // Play video
     try {
       await this.pending.play();
+      this.hasStartedPlayback = true; // Mark that playback has started
     } catch (error) {
       if (error.name === 'NotAllowedError') {
         log('⚠️ Autoplay blocked - showing interaction prompt');
@@ -159,6 +165,9 @@ class VideoPlayer {
   }
 
   swapVideos() {
+    // Ensure pending is ready to become active
+    this.pending.classList.remove('active');
+    
     // Fade out old, fade in new
     this.active.classList.remove('active');
     this.pending.classList.add('active');
@@ -172,7 +181,8 @@ class VideoPlayer {
     setTimeout(() => {
       this.pending.pause();
       this.pending.currentTime = 0;
-    }, 500);
+      this.pending.classList.remove('active'); // Ensure it's hidden
+    }, 600);
   }
 
   onVideoEnded(video) {
@@ -260,13 +270,23 @@ function sendMessage(msg) {
 // ============================================
 
 function handleInteraction() {
-  // First interaction - hide overlay and ensure video plays
+  // First interaction - hide overlay and start playback if needed
   if (!state.hasInteracted) {
     hideStartOverlay();
     state.hasInteracted = true;
     
-    // Restart video1 with user gesture
-    videoPlayer.loadAndPlay('video1');
+    // Only start video1 if it hasn't started yet
+    if (!videoPlayer.hasStartedPlayback) {
+      videoPlayer.loadAndPlay('video1');
+    } else {
+      // Video1 is already playing, just ensure it's playing
+      const active = videoPlayer.active;
+      if (active.paused) {
+        active.play().catch(err => {
+          console.error('Resume play failed:', err);
+        });
+      }
+    }
     return;
   }
 
@@ -383,14 +403,16 @@ window.addEventListener('load', async () => {
     console.error('Preload error:', err);
   });
 
-  // Try autoplay
-  videoPlayer.loadAndPlay('video1').catch(() => {
-    log('Autoplay failed - waiting for user interaction');
-  });
-
-  // Show overlay on iOS
+  // Show overlay on iOS or if autoplay will fail
   if (state.isIOS) {
     showStartOverlay();
+    log('iOS detected - waiting for user interaction');
+  } else {
+    // Try autoplay on non-iOS devices
+    videoPlayer.loadAndPlay('video1').catch(() => {
+      log('Autoplay failed - waiting for user interaction');
+      showStartOverlay();
+    });
   }
 
   // Debug FPS counter
