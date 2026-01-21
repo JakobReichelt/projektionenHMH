@@ -207,6 +207,8 @@ class VideoPlayer {
     setTimeout(() => {
       this.pending.pause();
       this.pending.currentTime = 0;
+      this.pending.loop = false; // Reset loop attribute
+      this.pending.removeAttribute('loop'); // Remove HTML attribute as well
       this.pending.classList.remove('active'); // Ensure it's hidden
     }, 600);
   }
