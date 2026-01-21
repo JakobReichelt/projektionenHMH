@@ -419,8 +419,9 @@ window.addEventListener('load', async () => {
   // Connect WebSocket
   connectWebSocket();
 
-  // Start preloading ALL videos immediately (non-blocking)
-  videoPlayer.preloadAllVideos().catch(err => {
+  // Preload ALL videos FIRST before allowing playback
+  log('⏳ Waiting for videos to cache...');
+  await videoPlayer.preloadAllVideos().catch(err => {
     console.error('Preload error:', err);
   });
 
@@ -429,7 +430,7 @@ window.addEventListener('load', async () => {
     showStartOverlay();
     log('iOS detected - tap to start');
   } else {
-    // Desktop: Try autoplay immediately
+    // Desktop: Try autoplay after all videos are cached
     log('Desktop - attempting autoplay');
     videoPlayer.loadAndPlay('video1').catch(() => {
       log('Autoplay blocked - showing overlay');
