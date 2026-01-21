@@ -9,7 +9,10 @@ const STATE = {
   videos: {},
   isIOS: CONFIG.isIOS(),
   isIPhone: typeof CONFIG.isIPhone === 'function' ? CONFIG.isIPhone() : /iPhone/.test(navigator.userAgent),
+  isAndroid: /Android/i.test(navigator.userAgent),
+  isMobile: /Android|iPhone|iPad|iPod/i.test(navigator.userAgent),
   activeVideoId: null,
+  logThrottle: new Map(),
   debug: {
     uiFps: null,
     rafId: null,
@@ -23,6 +26,19 @@ const STATE = {
 };
 
 const MAX_LOG_ENTRIES = 200;
+
+const addLogThrottled = (key, message, minIntervalMs = 800) => {
+  if (!key || minIntervalMs <= 0) {
+    addLog(message);
+    return;
+  }
+
+  const now = performance.now();
+  const last = STATE.logThrottle.get(key) ?? 0;
+  if (now - last < minIntervalMs) return;
+  STATE.logThrottle.set(key, now);
+  addLog(message);
+};
 
 // Cache video elements on load
 const initVideos = () => {
@@ -93,9 +109,10 @@ const preloadVideoSource = (videoId) => {
     ensureVideoSourceLoaded(videoId);
     const video = STATE.videos[videoId];
     if (!video) return;
-    // Encourage buffering for the *next* clip without pulling everything.
-    video.preload = 'auto';
-    if (STATE.activeVideoId !== videoId) {
+    // On mobile, aggressive preloading across multiple <video> tags can cause
+    // decoder/network contention and stutter. Keep it lighter.
+    video.preload = STATE.isMobile ? 'metadata' : 'auto';
+    if (!STATE.isMobile && STATE.activeVideoId !== videoId) {
       // Avoid interrupting currently playing video.
       video.load();
     }
@@ -168,8 +185,9 @@ const transitionToVideo = async (videoId, onEnded = null, isLooping = false, opt
   const prevId = STATE.activeVideoId;
   const prevVideo = prevId ? STATE.videos[prevId] : null;
 
-  // Freeze current frame while the next clip buffers.
-  if (prevVideo && prevId !== videoId) {
+  // Desktop: freeze current frame while the next clip buffers.
+  // Mobile: keep playing to avoid showing a stuck frame during slow buffering.
+  if (!STATE.isMobile && prevVideo && prevId !== videoId) {
     prevVideo.pause();
   }
 
@@ -221,7 +239,7 @@ const transitionToVideo = async (videoId, onEnded = null, isLooping = false, opt
 
   if (logWait) addLog(`⏳ Preparing: ${videoId}`);
   const ready = await waitForVideoReady(nextVideo, minReadyState, timeoutMs);
-  if (!ready) addLog(`⚠️ Not buffered yet: ${videoId} (ready=${nextVideo.readyState})`);
+  if (!ready && !STATE.isMobile) addLog(`⚠️ Not buffered yet: ${videoId} (ready=${nextVideo.readyState})`);
 
   // Ensure we start from the beginning. Seeking can throw before metadata is ready,
   // so do it after the ready wait.
@@ -268,9 +286,17 @@ const initializeVideoSequence = () => {
   document.getElementById('stageTitle').textContent = '';
   document.getElementById('stageText').textContent = '';
 
-  // Warm up first and next video only.
+  // Warm up first and next video only (desktop). Mobile keeps preloading minimal.
   preloadVideoSource('video1');
   preloadVideoSource('video2');
+
+  const firstOpts = STATE.isMobile
+    ? { minReadyState: 2, timeoutMs: 9000, logWait: false }
+    : { minReadyState: 3, timeoutMs: 4000, logWait: true };
+
+  const nextOpts = STATE.isMobile
+    ? { minReadyState: 2, timeoutMs: 9000, logWait: false }
+    : { minReadyState: 3, timeoutMs: 6000, logWait: true };
 
   // 1 -> 2 -> loop 3 (wait interaction) -> 4 -> 5 -> loop 6 (end)
   transitionToVideo('video1', () => {
@@ -281,11 +307,65 @@ const initializeVideoSequence = () => {
 
     transitionToVideo('video2', () => {
       preloadVideoSource('video4');
-      transitionToVideo('video3', null, true);
+      transitionToVideo('video3', null, true, nextOpts);
       STATE.currentStage = 'video3-looping';
       updateStageDisplay('video3-looping');
       STATE.hasInteracted = false;
-    }, false);
+    }, false, nextOpts);
+  }, false, firstOpts);
+};
+
+const playVideoImmediate = (videoId, onEnded = null, isLooping = false) => {
+  ensureVideoSourceLoaded(videoId);
+  const video = STATE.videos[videoId];
+  if (!video) return;
+
+  video.preload = 'auto';
+  video.loop = isLooping;
+  if (typeof onEnded === 'function') video.onended = onEnded;
+
+  try {
+    video.pause();
+    video.currentTime = 0;
+  } catch {
+    // ignore
+  }
+
+  Object.values(STATE.videos).forEach(v => {
+    if (v !== video) {
+      v.classList.remove('active');
+      v.pause();
+    }
+  });
+  video.classList.add('active');
+  STATE.activeVideoId = videoId;
+  startVideoFpsMonitor();
+  updateDebugMetrics();
+
+  try {
+    void (video.play() || Promise.resolve());
+  } catch {
+    // ignore
+  }
+};
+
+const initializeVideoSequenceIOS = () => {
+  document.getElementById('stageTitle').textContent = '';
+  document.getElementById('stageText').textContent = '';
+
+  // Start the first play() inside the user gesture (handleInteraction) to unlock playback.
+  playVideoImmediate('video1', () => {
+    STATE.currentStage = 'video2';
+    updateStageDisplay('video2');
+
+    preloadVideoSource('video3');
+    transitionToVideo('video2', () => {
+      preloadVideoSource('video4');
+      transitionToVideo('video3', null, true, { minReadyState: 2, timeoutMs: 9000, logWait: false });
+      STATE.currentStage = 'video3-looping';
+      updateStageDisplay('video3-looping');
+      STATE.hasInteracted = false;
+    }, false, { minReadyState: 2, timeoutMs: 9000, logWait: false });
   }, false);
 };
 
@@ -320,7 +400,7 @@ const handleInteraction = () => {
 
   if (STATE.isIOS && !STATE.iosInitiated) {
     STATE.iosInitiated = true;
-    initializeVideoSequence();
+    initializeVideoSequenceIOS();
     return;
   }
 
@@ -693,9 +773,10 @@ window.addEventListener('load', () => {
 
   // Useful playback events (helps diagnose buffering)
   Object.entries(STATE.videos).forEach(([id, video]) => {
-    video.addEventListener('waiting', () => addLog(`⏳ Buffering: ${id}`));
-    video.addEventListener('playing', () => addLog(`▶️ Playing: ${id}`));
-    video.addEventListener('stalled', () => addLog(`⚠️ Stalled: ${id}`));
+    const throttle = STATE.isMobile ? 1200 : 200;
+    video.addEventListener('waiting', () => addLogThrottled(`waiting:${id}`, `⏳ Buffering: ${id}`, throttle));
+    video.addEventListener('playing', () => addLogThrottled(`playing:${id}`, `▶️ Playing: ${id}`, throttle));
+    video.addEventListener('stalled', () => addLogThrottled(`stalled:${id}`, `⚠️ Stalled: ${id}`, throttle));
   });
   
   if (!STATE.isIOS) {
