@@ -125,6 +125,26 @@ class VideoPlayer {
       return false;
     }
 
+    // Special handling for video5 - show black screen for 16 seconds
+    if (stageId === 'video5') {
+      log(`▶️ Playing: ${stageId} (black screen for 16 seconds)`);
+      
+      // Hide current video to create black screen effect
+      this.active.classList.remove('active');
+      
+      // Update state
+      state.currentStage = stageId;
+      updateDebugInfo();
+      
+      // Wait 16 seconds, then advance to video6-looping
+      setTimeout(() => {
+        log(`⏭️ Black screen complete - advancing to: video6-looping`);
+        this.loadAndPlay('video6-looping');
+      }, 16000);
+      
+      return true;
+    }
+
     log(`▶️ Playing: ${stageId}`);
     
     // Get cached video URL (blob or fallback path)
