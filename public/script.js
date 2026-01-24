@@ -181,6 +181,13 @@ class VideoPlayer {
     
     log(`✓ Now in stage: ${stageId}`);
 
+    // Show stage 6 content overlay when video6-looping starts
+    if (stageId === 'video6-looping') {
+      showStage6Content();
+    } else {
+      hideStage6Content();
+    }
+
     // Preload next video after a short delay to allow swap to finish
     this.preloadNext(stageId);
 
@@ -505,6 +512,25 @@ document.addEventListener('keydown', (e) => {
     debouncedInteraction(e);
   }
 });
+
+// ============================================
+// STAGE 6 CONTENT OVERLAY
+// ============================================
+
+function showStage6Content() {
+  const overlay = document.getElementById('stage6Overlay');
+  if (overlay) {
+    overlay.classList.remove('hidden');
+    log('✓ Stage 6 content visible');
+  }
+}
+
+function hideStage6Content() {
+  const overlay = document.getElementById('stage6Overlay');
+  if (overlay) {
+    overlay.classList.add('hidden');
+  }
+}
 
 // ============================================
 // INITIALIZATION
