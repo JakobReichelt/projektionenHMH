@@ -62,58 +62,30 @@ class VideoPlayer {
     });
   }
 
-  // Preload videos - smart strategy based on device
+  // Preload videos - using browser cache for all devices
   async preloadAllVideos() {
     if (this.isPreloading) return;
     this.isPreloading = true;
     
-    const isMobile = state.isIOS || /Android/i.test(navigator.userAgent);
-    
-    log(`🔄 Preloading videos (${isMobile ? 'mobile mode' : 'desktop mode'})...`);
+    log(`🔄 Preloading videos...`);
     
     const videoOrder = ['video1', 'video2', 'video3-looping', 'video4', 'video5', 'video6-looping'];
     
-    // On mobile: Don't use blob caching (causes memory issues and slow loading)
-    // Instead, rely on browser's HTTP cache with preload hints
-    if (isMobile) {
-      log('📱 Mobile - using lightweight preload strategy');
-      
-      for (const videoId of videoOrder) {
-        const videoPath = VIDEO_PATHS[videoId];
-        
-        // Just mark with direct path - let browser handle caching
-        this.videoCache.set(videoId, videoPath);
-        
-        // Trigger browser cache with HEAD request (lightweight)
-        fetch(videoPath, { method: 'HEAD' }).catch(() => {});
-        log(`✓ Registered: ${videoId}`);
-      }
-      
-      log('✅ Mobile preload complete');
-      this.isPreloading = false;
-      return;
-    }
-    
-    // Desktop: Use blob caching for instant playback
+    // Use lightweight preload strategy for all devices to avoid memory issues
+    // and let the browser's native caching/streaming handle the heavy lifting.
     for (const videoId of videoOrder) {
       const videoPath = VIDEO_PATHS[videoId];
       
-      try {
-        log(`⬇️ Fetching: ${videoId}...`);
-        const response = await fetch(videoPath);
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        
-        this.videoCache.set(videoId, blobUrl);
-        log(`✓ Cached: ${videoId} (${(blob.size / 1024 / 1024).toFixed(1)}MB)`);
-      } catch (error) {
-        console.error(`Failed to preload ${videoId}:`, error);
-        log(`❌ Failed: ${videoId}`);
-        this.videoCache.set(videoId, videoPath);
-      }
+      // Register direct path
+      this.videoCache.set(videoId, videoPath);
+      
+      // Trigger browser cache with HEAD request
+      // This helps with connection setup and initial headers caching
+      fetch(videoPath, { method: 'HEAD' }).catch(() => {});
+      log(`✓ Registered: ${videoId}`);
     }
     
-    log('✅ All videos cached in memory');
+    log('✅ Preload setup complete');
     this.isPreloading = false;
   }
 
@@ -167,7 +139,11 @@ class VideoPlayer {
     this.pending.preload = 'auto';
     
     // Use cached blob URL for instant playback
-    if (this.pending.src !== videoUrl) {
+    // robust comparison of absolute vs relative URLs
+    const currentSrc = this.pending.src;
+    const targetSrc = new URL(videoUrl, window.location.href).href;
+
+    if (currentSrc !== targetSrc) {
       this.pending.src = videoUrl;
       this.pending.load();
     } else {
@@ -205,7 +181,41 @@ class VideoPlayer {
     
     log(`✓ Now in stage: ${stageId}`);
 
+    // Preload next video after a short delay to allow swap to finish
+    this.preloadNext(stageId);
+
     return true;
+  }
+
+  preloadNext(currentStageId) {
+    const config = STAGE_FLOW[currentStageId];
+    // Determine next stage
+    let nextStage = config ? config.next : null;
+    
+    // Special speculative preloading for video3
+    if (currentStageId === 'video3-looping') {
+        nextStage = 'video4';
+    }
+
+    if (!nextStage) return;
+
+    log(`⏳ Scheduled preload for: ${nextStage}`);
+    
+    // Wait for swap transition (600ms) to complete before touching pending video
+    setTimeout(() => {
+       const nextUrl = this.videoCache.get(nextStage) || VIDEO_PATHS[nextStage];
+       
+       // Verify we are still in the same stage (user hasn't jumped)
+       if (state.currentStage !== currentStageId) return;
+
+       // Use this.pending which is now free (the hidden video layer)
+       // This allows the browser to buffer the next video while current one plays
+       log(`⬇️ Buffering next: ${nextStage}`);
+       
+       this.pending.src = nextUrl;
+       this.pending.preload = 'auto';
+       this.pending.load(); 
+    }, 1000);
   }
 
   waitForCanPlay(video) {
