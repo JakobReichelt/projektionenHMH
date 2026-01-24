@@ -1,4 +1,29 @@
 /* ============================================
+   FONTS
+   ============================================ */
+
+@font-face {
+    font-family: 'Circular Std';
+    src: url('/assets/Circular Std/CircularStd-Book.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Circular Std';
+    src: url('/assets/Circular Std/CircularStd-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Circular Std';
+    src: url('/assets/Circular Std/CircularStd-Black.otf') format('opentype');
+    font-weight: 900;
+    font-style: normal;
+}
+
+/* ============================================
    RESET & BASE
    ============================================ */
 
@@ -119,7 +144,7 @@ body {
 
 /* Main Title */
 .main-title {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Circular Std', 'Helvetica Neue', Arial, sans-serif;
     font-weight: 700;
     font-size: 40px;
     line-height: 1.2;
@@ -129,7 +154,7 @@ body {
 
 /* Text Blocks */
 .text-block {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Circular Std', 'Helvetica Neue', Arial, sans-serif;
     font-weight: 400;
     font-size: 14px;
     line-height: 1.4;
@@ -153,7 +178,7 @@ body {
 
 /* Project Title */
 .project-title {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Circular Std', 'Helvetica Neue', Arial, sans-serif;
     font-weight: 700;
     font-size: 20px;
     line-height: 1.2;
@@ -185,7 +210,7 @@ body {
 }
 
 .footer-text {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Circular Std', 'Helvetica Neue', Arial, sans-serif;
     font-weight: 400;
     font-size: 14px;
     line-height: 1.6;
