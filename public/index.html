@@ -83,6 +83,18 @@
             <div class="metric"><span>UI FPS:</span><span id="debugUiFps">-</span></div>
             <div class="metric"><span>State:</span><span id="debugStates">-</span></div>
         </div>
+
+        <div class="stage-switcher">
+            <div class="switcher-label">Quick Stage Switch:</div>
+            <div class="stage-buttons">
+                <button class="stage-btn" onclick="switchToStage('video1')">1</button>
+                <button class="stage-btn" onclick="switchToStage('video2')">2</button>
+                <button class="stage-btn" onclick="switchToStage('video3-looping')">3</button>
+                <button class="stage-btn" onclick="switchToStage('video4')">4</button>
+                <button class="stage-btn" onclick="switchToStage('video5')">5</button>
+                <button class="stage-btn" onclick="switchToStage('video6-looping')">6</button>
+            </div>
+        </div>
         
         <div class="connection-status disconnected" id="status">
             <span id="statusText">Disconnected</span>

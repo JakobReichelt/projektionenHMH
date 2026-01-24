@@ -465,6 +465,15 @@ window.toggleDebugPanel = () => {
   document.getElementById('debugPanel').classList.toggle('show');
 };
 
+window.switchToStage = (stageId) => {
+  log(`🔄 Manual stage switch to: ${stageId}`);
+  if (videoPlayer) {
+    videoPlayer.loadAndPlay(stageId);
+  } else {
+    log('⚠️ Video player not initialized yet');
+  }
+};
+
 document.getElementById('clearLogBtn')?.addEventListener('click', () => {
   const logEl = document.getElementById('messageLog');
   if (logEl) logEl.innerHTML = '';
