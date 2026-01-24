@@ -3,12 +3,12 @@
 // ============================================
 
 const VIDEO_PATHS = {
-  'video1': '/1.mp4',
-  'video2': '/2.mp4',
-  'video3-looping': '/3.mp4',
-  'video4': '/4.mp4',
-  'video5': '/5.mp4',
-  'video6-looping': '/6.mp4'
+  'video1': '/1.mp4?v=2',
+  'video2': '/2.mp4?v=2',
+  'video3-looping': '/3.mp4?v=2',
+  'video4': '/4.mp4?v=2',
+  'video5': '/5.mp4?v=2',
+  'video6-looping': '/6.mp4?v=2'
 };
 
 const STAGE_FLOW = {

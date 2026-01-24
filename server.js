@@ -48,8 +48,8 @@ app.get(/^\/[1-6]\.mp4$/, (req, res, next) => {
   const fileSize = stat.size;
   const range = req.headers.range;
   
-  // Set aggressive caching (7 days)
-  res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+  // Set moderate caching (1 hour) to allow for updates
+  res.setHeader('Cache-Control', 'public, max-age=3600');
   res.setHeader('Accept-Ranges', 'bytes');
   
   if (range) {
