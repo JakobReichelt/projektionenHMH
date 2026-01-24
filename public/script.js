@@ -125,8 +125,8 @@ class VideoPlayer {
       return false;
     }
     
-    // Prevent duplicate stage transitions
-    if (state.currentStage === stageId) {
+    // Prevent duplicate stage transitions (only if playback has started)
+    if (state.currentStage === stageId && this.hasStartedPlayback) {
       log(`⚠️ Already in stage ${stageId} - ignoring duplicate transition`);
       return false;
     }
