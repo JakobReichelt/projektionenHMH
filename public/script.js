@@ -124,6 +124,12 @@ class VideoPlayer {
       console.error(`Invalid stage: ${stageId}`);
       return false;
     }
+    
+    // Prevent duplicate stage transitions
+    if (state.currentStage === stageId) {
+      log(`⚠️ Already in stage ${stageId} - ignoring duplicate transition`);
+      return false;
+    }
 
     // Special handling for video5 - show black screen for 16 seconds
     if (stageId === 'video5') {
@@ -145,7 +151,7 @@ class VideoPlayer {
       return true;
     }
 
-    log(`▶️ Playing: ${stageId}`);
+    log(`▶️ Transitioning from ${state.currentStage} to ${stageId}`);
     
     // Get cached video URL (blob or fallback path)
     const cachedUrl = this.videoCache.get(stageId);
@@ -192,10 +198,12 @@ class VideoPlayer {
     // Swap active/pending
     this.swapVideos();
     
-    // Update state
+    // Update state AFTER successful playback
     state.currentStage = stageId;
     state.activeVideo = this.active;
     updateDebugInfo();
+    
+    log(`✓ Now in stage: ${stageId}`);
 
     return true;
   }
