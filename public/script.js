@@ -457,20 +457,42 @@ document.getElementById('clearLogBtn')?.addEventListener('click', () => {
 // EVENT LISTENERS
 // ============================================
 
+let lastInteractionTime = 0;
+const INTERACTION_DEBOUNCE = 300; // ms
+
+function debouncedInteraction(e) {
+  const now = Date.now();
+  if (now - lastInteractionTime < INTERACTION_DEBOUNCE) {
+    log('⚠️ Interaction debounced (too fast)');
+    return;
+  }
+  lastInteractionTime = now;
+  handleInteraction();
+}
+
+// Use touchend instead of touchstart to prevent double-firing with click
+let touchHandled = false;
+
+document.addEventListener('touchend', (e) => {
+  if (e.target.closest('.debug-panel, .debug-toggle')) return;
+  e.preventDefault(); // Prevent click event from firing
+  touchHandled = true;
+  debouncedInteraction(e);
+  
+  // Reset flag after a delay
+  setTimeout(() => { touchHandled = false; }, 500);
+}, { passive: false });
+
 document.addEventListener('click', (e) => {
   if (e.target.closest('.debug-panel, .debug-toggle')) return;
-  handleInteraction();
+  if (touchHandled) return; // Skip if touch already handled this
+  debouncedInteraction(e);
 });
-
-document.addEventListener('touchstart', (e) => {
-  if (e.target.closest('.debug-panel, .debug-toggle')) return;
-  handleInteraction();
-}, { passive: true });
 
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'Enter') {
     e.preventDefault();
-    handleInteraction();
+    debouncedInteraction(e);
   }
 });
 
