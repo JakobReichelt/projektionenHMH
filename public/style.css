@@ -219,6 +219,7 @@ body {
     left: 11px;
     width: 294px;
     height: 61px;
+    z-index: 1;
 }
 
 .nanas-image-section {
@@ -227,7 +228,8 @@ body {
     margin-left: -13px;
     overflow: hidden;
     position: absolute;
-    top: 1003px;
+    top: 1020px;
+    z-index: 0;
 }
 
 .section-img {
@@ -237,7 +239,7 @@ body {
 }
 
 .section-text:nth-of-type(1) {
-    top: 1242px;
+    top: 1260px;
     left: calc(50% - 184px);
     height: 272px;
 }
@@ -248,6 +250,7 @@ body {
     left: 6px;
     width: 294px;
     height: 64px;
+    z-index: 1;
 }
 
 .sprengel-image-section {
@@ -256,11 +259,12 @@ body {
     margin-left: -13px;
     overflow: hidden;
     position: absolute;
-    top: 1654px;
+    top: 1674px;
+    z-index: 0;
 }
 
 .section-text:nth-of-type(2) {
-    top: 1892px;
+    top: 1910px;
     height: 238px;
 }
 
@@ -270,6 +274,7 @@ body {
     left: 11px;
     width: 356px;
     height: 48px;
+    z-index: 1;
 }
 
 .grotte-image-section {
@@ -278,7 +283,8 @@ body {
     margin-left: -41px;
     overflow: hidden;
     position: absolute;
-    top: 2304px;
+    top: 2320px;
+    z-index: 0;
 }
 
 /* Circle Button */
@@ -297,7 +303,7 @@ body {
 }
 
 .section-text:nth-of-type(3) {
-    top: 2566px;
+    top: 2590px;
     height: 136px;
 }
 
@@ -308,6 +314,7 @@ body {
     width: 527px;
     height: 141px;
     line-height: 0.697;
+    z-index: 1;
 }
 
 .promenade-image-section {
@@ -316,11 +323,12 @@ body {
     margin-left: -50px;
     overflow: hidden;
     position: absolute;
-    top: 2974px;
+    top: 3030px;
+    z-index: 0;
 }
 
 .section-text:nth-of-type(4) {
-    top: 3236px;
+    top: 3290px;
     width: 314px;
     height: 136px;
 }
