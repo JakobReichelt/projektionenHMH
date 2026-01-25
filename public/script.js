@@ -149,18 +149,29 @@ class VideoPlayer {
     
     // iOS-specific aggressive preloading for first video to reduce initial load time
     if (state.isIOS) {
-      log('iOS detected - preloading first video with metadata');
+      log('iOS detected - preloading first video');
       const firstVideoPath = VIDEO_PATHS['video1'];
       this.videoCache.set('video1', firstVideoPath);
       
-      // On iOS, set the first video immediately to start metadata loading
+      // On iOS, set the first video on the ACTIVE element (video1)
+      // so it's ready when user taps to start
+      this.video1.dataset.stage = 'video1';
       this.video1.src = firstVideoPath;
-      this.video1.preload = 'metadata';
+      this.video1.preload = 'auto'; // Use 'auto' for better buffering
       this.video1.load();
-      log(`✓ iOS: Preloaded video1 with metadata`);
+      log(`✓ iOS: Preloaded video1 on active element`);
+      
+      // ALSO preload video2 on the pending element since video1 is very short
+      const secondVideoPath = VIDEO_PATHS['video2'];
+      this.videoCache.set('video2', secondVideoPath);
+      this.video2.dataset.stage = 'video2';
+      this.video2.src = secondVideoPath;
+      this.video2.preload = 'auto';
+      this.video2.load();
+      log(`✓ iOS: Preloaded video2 on pending element`);
       
       // Register remaining videos
-      for (let i = 1; i < videoOrder.length; i++) {
+      for (let i = 2; i < videoOrder.length; i++) {
         const videoId = videoOrder[i];
         const videoPath = VIDEO_PATHS[videoId];
         this.videoCache.set(videoId, videoPath);
@@ -229,42 +240,56 @@ class VideoPlayer {
     
     const videoUrl = cachedUrl || VIDEO_PATHS[stageId];
     
-    // Prepare pending video
-    this.pending.loop = config.loop;
-    this.pending.dataset.stage = stageId;
+    // iOS SPECIAL CASE: For video1, use the active element which was already preloaded
+    // This avoids reloading and uses the already-buffered video
+    let targetVideo = this.pending;
     
-    // iOS-specific: Use 'auto' preload for better buffering
-    // Other platforms already work well with 'auto'
-    this.pending.preload = 'auto';
+    if (state.isIOS && stageId === 'video1' && !this.hasStartedPlayback) {
+      // On iOS, video1 was preloaded on this.active (video1 element)
+      // Check if it's already loaded there
+      const activeSrc = new URL(this.active.src || '', window.location.href).href;
+      const targetSrc = new URL(videoUrl, window.location.href).href;
+      
+      if (activeSrc === targetSrc && this.active.readyState >= 1) {
+        log(`📱 iOS: Using pre-loaded video1 from active element (readyState: ${this.active.readyState})`);
+        targetVideo = this.active;
+        // Don't swap videos for this case
+      }
+    }
     
-    // Use cached blob URL for instant playback
-    // robust comparison of absolute vs relative URLs
-    const currentSrc = this.pending.src;
+    // Prepare target video
+    targetVideo.loop = config.loop;
+    targetVideo.dataset.stage = stageId;
+    targetVideo.preload = 'auto';
+    
+    // Check if we need to load a new source
+    const currentSrc = targetVideo.src;
     const targetSrc = new URL(videoUrl, window.location.href).href;
 
     if (currentSrc !== targetSrc) {
-      this.pending.src = videoUrl;
-      this.pending.load();
+      targetVideo.src = videoUrl;
+      targetVideo.load();
       
-      // iOS debug: Log current state
       if (state.isIOS) {
-        log(`📱 iOS: Video src set for ${stageId}, readyState: ${this.pending.readyState}, networkState: ${this.pending.networkState}`);
+        log(`📱 iOS: Video src set for ${stageId}, readyState: ${targetVideo.readyState}, networkState: ${targetVideo.networkState}`);
       }
     } else {
-      this.pending.currentTime = 0;
+      if (state.isIOS) {
+        log(`📱 iOS: Reusing already-loaded src for ${stageId}, readyState: ${targetVideo.readyState}`);
+      }
+      targetVideo.currentTime = 0;
     }
 
     // CRITICAL: On iOS, we must call play() IMMEDIATELY within user gesture context
     // iOS Safari will NOT buffer videos until play() is called
-    // Waiting for canplaythrough BEFORE play() breaks the user gesture chain
-    const playPromise = this.pending.play();
+    const playPromise = targetVideo.play();
     
     if (state.isIOS) {
       log(`📱 iOS: play() called for ${stageId}, waiting for playback...`);
     }
 
     // Wait for video to be ready (this will resolve quickly if buffered)
-    await this.waitForCanPlay(this.pending);
+    await this.waitForCanPlay(targetVideo);
 
     // Now wait for the play promise to complete
     try {
@@ -284,12 +309,19 @@ class VideoPlayer {
       throw error;
     }
 
-    // Swap active/pending
-    this.swapVideos();
+    // Swap active/pending (only if we used pending)
+    if (targetVideo === this.pending) {
+      this.swapVideos();
+    } else {
+      // Using active directly (iOS video1 case) - just make sure it's visible
+      targetVideo.classList.add('active');
+      // Update active reference to targetVideo
+      this.active = targetVideo;
+    }
     
     // Update state AFTER successful playback
     state.currentStage = stageId;
-    state.activeVideo = this.active;
+    state.activeVideo = targetVideo;
     updateDebugInfo();
     
     log(`✓ Now in stage: ${stageId}`);
@@ -332,15 +364,14 @@ class VideoPlayer {
        // This allows the browser to buffer the next video while current one plays
        log(`⬇️ Buffering next: ${nextStage}`);
        
+       // Set dataset.stage for debug logging
+       this.pending.dataset.stage = nextStage;
        this.pending.src = nextUrl;
-       
-       // iOS-specific: Use 'auto' preload for aggressive buffering
        this.pending.preload = 'auto';
        this.pending.load();
        
-       // iOS-specific: Force early buffering by seeking to start
        if (state.isIOS) {
-         this.pending.currentTime = 0;
+         log(`📱 iOS: Started buffering ${nextStage}`);
        }
     }, 1000);
   }
