@@ -376,13 +376,14 @@ body {
     overflow: hidden;
     position: absolute;
     top: 2974px;
-    z-index: 0;
+    z-index: 2;
 }
 
 .section-text:nth-of-type(4) {
     top: 3236px;
     width: 314px;
     height: 136px;
+    z-index: 2;
 }
 
 /* Bottom Section */
@@ -392,6 +393,7 @@ body {
     left: 0;
     width: 390px;
     height: 682px;
+    z-index: 0;
 }
 
 .bottom-img {
