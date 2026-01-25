@@ -33,10 +33,22 @@ const DEFAULT_FOLDER = getDefaultFolder();
 app.use(express.json());
 app.use(express.static('public'));
 
+// Helper function to find folder case-insensitively
+const findFolder = (folderName) => {
+  if (!folderName) return null;
+  const folders = getAssetFolders();
+  return folders.find(f => f.toLowerCase() === folderName.toLowerCase()) || null;
+};
+
 // Serve video files with range request support for better streaming
 app.get(/^\/[1-6]\.mp4$/, (req, res, next) => {
   const videoFile = req.path.slice(1);
-  const show = req.query.show || DEFAULT_FOLDER;
+  const requestedShow = req.query.show || DEFAULT_FOLDER;
+  
+  if (!requestedShow) return next();
+  
+  // Find the actual folder name (case-insensitive)
+  const show = findFolder(requestedShow);
   
   if (!show) return next();
   

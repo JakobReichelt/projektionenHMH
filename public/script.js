@@ -43,6 +43,8 @@ function getVideoPaths() {
   const baseParams = 'v=2';
   const showQuery = showParam ? `&show=${encodeURIComponent(showParam)}` : '';
   
+  console.log('Building video paths with show parameter:', showParam);
+  
   return {
     'video1': `/1.mp4?${baseParams}${showQuery}`,
     'video2': `/2.mp4?${baseParams}${showQuery}`,
@@ -54,6 +56,7 @@ function getVideoPaths() {
 }
 
 const VIDEO_PATHS = getVideoPaths();
+console.log('Video paths initialized:', VIDEO_PATHS);
 
 const STAGE_FLOW = {
   'video1': { next: 'video2', loop: false },
