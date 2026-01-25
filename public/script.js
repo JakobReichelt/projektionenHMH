@@ -118,18 +118,38 @@ class VideoPlayer {
     
     const videoOrder = ['video1', 'video2', 'video3-looping', 'video4', 'video5', 'video6-looping'];
     
-    // Use lightweight preload strategy for all devices to avoid memory issues
-    // and let the browser's native caching/streaming handle the heavy lifting.
-    for (const videoId of videoOrder) {
-      const videoPath = VIDEO_PATHS[videoId];
+    // iOS-specific aggressive preloading for first video to reduce initial load time
+    if (state.isIOS) {
+      log('iOS detected - preloading first video with metadata');
+      const firstVideoPath = VIDEO_PATHS['video1'];
+      this.videoCache.set('video1', firstVideoPath);
       
-      // Register direct path
-      this.videoCache.set(videoId, videoPath);
+      // On iOS, set the first video immediately to start metadata loading
+      this.video1.src = firstVideoPath;
+      this.video1.preload = 'metadata';
+      this.video1.load();
+      log(`✓ iOS: Preloaded video1 with metadata`);
       
-      // Trigger browser cache with HEAD request
-      // This helps with connection setup and initial headers caching
-      fetch(videoPath, { method: 'HEAD' }).catch(() => {});
-      log(`✓ Registered: ${videoId}`);
+      // Register remaining videos
+      for (let i = 1; i < videoOrder.length; i++) {
+        const videoId = videoOrder[i];
+        const videoPath = VIDEO_PATHS[videoId];
+        this.videoCache.set(videoId, videoPath);
+        log(`✓ Registered: ${videoId}`);
+      }
+    } else {
+      // Desktop/Android: Use lightweight preload strategy
+      for (const videoId of videoOrder) {
+        const videoPath = VIDEO_PATHS[videoId];
+        
+        // Register direct path
+        this.videoCache.set(videoId, videoPath);
+        
+        // Trigger browser cache with HEAD request
+        // This helps with connection setup and initial headers caching
+        fetch(videoPath, { method: 'HEAD' }).catch(() => {});
+        log(`✓ Registered: ${videoId}`);
+      }
     }
     
     log('✅ Preload setup complete');
@@ -183,6 +203,9 @@ class VideoPlayer {
     // Prepare pending video
     this.pending.loop = config.loop;
     this.pending.dataset.stage = stageId;
+    
+    // iOS-specific: Use 'auto' preload for better buffering
+    // Other platforms already work well with 'auto'
     this.pending.preload = 'auto';
     
     // Use cached blob URL for instant playback
@@ -192,17 +215,33 @@ class VideoPlayer {
 
     if (currentSrc !== targetSrc) {
       this.pending.src = videoUrl;
-      this.pending.load();
+      
+      // iOS-specific: Force load to start buffering immediately
+      if (state.isIOS) {
+        this.pending.load();
+        // Small delay to let iOS start buffering before play
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } else {
+        this.pending.load();
+      }
     } else {
       this.pending.currentTime = 0;
     }
 
+    // iOS-specific: Wait for better buffering before playing to reduce stuttering
+    if (state.isIOS) {
+      // On iOS, wait for canplaythrough for smoother playback
+      await this.waitForCanPlayThrough(this.pending);
+    }
+    
     // On mobile/strict browsers, we need to call play() BEFORE awaiting canplay
     // to preserve the user gesture context. Start playing immediately.
     const playPromise = this.pending.play();
 
     // Wait for video to be ready (this will resolve quickly if buffered)
-    await this.waitForCanPlay(this.pending);
+    if (!state.isIOS) {
+      await this.waitForCanPlay(this.pending);
+    }
 
     // Now wait for the play promise to complete
     try {
@@ -271,8 +310,15 @@ class VideoPlayer {
        log(`⬇️ Buffering next: ${nextStage}`);
        
        this.pending.src = nextUrl;
+       
+       // iOS-specific: Use 'auto' preload for aggressive buffering
        this.pending.preload = 'auto';
-       this.pending.load(); 
+       this.pending.load();
+       
+       // iOS-specific: Force early buffering by seeking to start
+       if (state.isIOS) {
+         this.pending.currentTime = 0;
+       }
     }, 1000);
   }
 
@@ -282,6 +328,25 @@ class VideoPlayer {
         resolve();
       } else {
         video.addEventListener('canplay', resolve, { once: true });
+      }
+    });
+  }
+
+  waitForCanPlayThrough(video) {
+    return new Promise((resolve) => {
+      if (video.readyState >= 4) {
+        resolve();
+      } else {
+        // iOS: Wait for canplaythrough with timeout to avoid infinite waiting
+        const timeout = setTimeout(() => {
+          log('⚠️ iOS: canplaythrough timeout, proceeding anyway');
+          resolve();
+        }, 3000);
+        
+        video.addEventListener('canplaythrough', () => {
+          clearTimeout(timeout);
+          resolve();
+        }, { once: true });
       }
     });
   }
