@@ -653,6 +653,9 @@ function loadStage6Content() {
   const container = document.getElementById('stage6Content');
   if (!container) return;
   
+  // Add data attribute to identify which show is loaded
+  container.setAttribute('data-show', showKey);
+  
   let html = `
     <!-- Top Portrait Image -->
     <div class="top-portrait-section">
