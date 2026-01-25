@@ -118,10 +118,12 @@ body {
     background: #000;
     z-index: 50;
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
 }
 
 .stage6-content {
+    width: 390px;
     max-width: 390px;
     margin: 0 auto;
     padding: 0 0 100px 0;
@@ -129,6 +131,7 @@ body {
     color: white;
     position: relative;
     min-height: 3708px;
+    overflow-x: hidden;
 }
 
 /* Top Portrait Section */
