@@ -105,7 +105,36 @@ class VideoPlayer {
       video.addEventListener('canplaythrough', () => {
         const stage = video.dataset.stage;
         if (stage) log(`✓ Video buffered: ${stage}`);
-      }, { once: true });
+      });
+      
+      // iOS debug logging
+      if (state.isIOS) {
+        video.addEventListener('loadstart', () => {
+          log(`📱 iOS loadstart: ${video.dataset.stage || 'unknown'}`);
+        });
+        video.addEventListener('loadedmetadata', () => {
+          log(`📱 iOS loadedmetadata: ${video.dataset.stage || 'unknown'} (duration: ${video.duration}s)`);
+        });
+        video.addEventListener('loadeddata', () => {
+          log(`📱 iOS loadeddata: ${video.dataset.stage || 'unknown'} (readyState: ${video.readyState})`);
+        });
+        video.addEventListener('canplay', () => {
+          log(`📱 iOS canplay: ${video.dataset.stage || 'unknown'} (readyState: ${video.readyState})`);
+        });
+        video.addEventListener('waiting', () => {
+          log(`📱 iOS waiting/buffering: ${video.dataset.stage || 'unknown'}`);
+        });
+        video.addEventListener('stalled', () => {
+          log(`📱 iOS stalled: ${video.dataset.stage || 'unknown'} (networkState: ${video.networkState})`);
+        });
+        video.addEventListener('playing', () => {
+          log(`📱 iOS playing: ${video.dataset.stage || 'unknown'}`);
+        });
+        video.addEventListener('progress', () => {
+          const buffered = video.buffered.length > 0 ? video.buffered.end(0).toFixed(1) : 0;
+          log(`📱 iOS progress: ${video.dataset.stage || 'unknown'} buffered: ${buffered}s`);
+        });
+      }
     });
   }
 
@@ -215,33 +244,27 @@ class VideoPlayer {
 
     if (currentSrc !== targetSrc) {
       this.pending.src = videoUrl;
+      this.pending.load();
       
-      // iOS-specific: Force load to start buffering immediately
+      // iOS debug: Log current state
       if (state.isIOS) {
-        this.pending.load();
-        // Small delay to let iOS start buffering before play
-        await new Promise(resolve => setTimeout(resolve, 100));
-      } else {
-        this.pending.load();
+        log(`📱 iOS: Video src set for ${stageId}, readyState: ${this.pending.readyState}, networkState: ${this.pending.networkState}`);
       }
     } else {
       this.pending.currentTime = 0;
     }
 
-    // iOS-specific: Wait for better buffering before playing to reduce stuttering
-    if (state.isIOS) {
-      // On iOS, wait for canplaythrough for smoother playback
-      await this.waitForCanPlayThrough(this.pending);
-    }
-    
-    // On mobile/strict browsers, we need to call play() BEFORE awaiting canplay
-    // to preserve the user gesture context. Start playing immediately.
+    // CRITICAL: On iOS, we must call play() IMMEDIATELY within user gesture context
+    // iOS Safari will NOT buffer videos until play() is called
+    // Waiting for canplaythrough BEFORE play() breaks the user gesture chain
     const playPromise = this.pending.play();
+    
+    if (state.isIOS) {
+      log(`📱 iOS: play() called for ${stageId}, waiting for playback...`);
+    }
 
     // Wait for video to be ready (this will resolve quickly if buffered)
-    if (!state.isIOS) {
-      await this.waitForCanPlay(this.pending);
-    }
+    await this.waitForCanPlay(this.pending);
 
     // Now wait for the play promise to complete
     try {
@@ -335,15 +358,18 @@ class VideoPlayer {
   waitForCanPlayThrough(video) {
     return new Promise((resolve) => {
       if (video.readyState >= 4) {
+        log(`📱 iOS: Already at readyState 4 (canplaythrough)`);
         resolve();
       } else {
-        // iOS: Wait for canplaythrough with timeout to avoid infinite waiting
+        log(`📱 iOS: Waiting for canplaythrough, current readyState: ${video.readyState}`);
+        // iOS: Wait for canplaythrough with short timeout
         const timeout = setTimeout(() => {
-          log('⚠️ iOS: canplaythrough timeout, proceeding anyway');
+          log(`⚠️ iOS: canplaythrough timeout (readyState: ${video.readyState}, networkState: ${video.networkState})`);
           resolve();
-        }, 3000);
+        }, 2000);
         
         video.addEventListener('canplaythrough', () => {
+          log(`📱 iOS: canplaythrough received`);
           clearTimeout(timeout);
           resolve();
         }, { once: true });

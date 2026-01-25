@@ -41,6 +41,7 @@ const findFolder = (folderName) => {
 };
 
 // Serve video files with range request support for better streaming
+// iOS Safari requires proper range request handling and specific headers
 app.get(/^\/[1-6]\.mp4$/, (req, res, next) => {
   const videoFile = req.path.slice(1);
   const requestedShow = req.query.show || DEFAULT_FOLDER;
@@ -60,28 +61,48 @@ app.get(/^\/[1-6]\.mp4$/, (req, res, next) => {
   const fileSize = stat.size;
   const range = req.headers.range;
   
-  // Set moderate caching (1 hour) to allow for updates
+  // iOS Safari specific: Log user agent for debugging
+  const userAgent = req.headers['user-agent'] || '';
+  const isIOS = /iPhone|iPad|iPod/.test(userAgent);
+  if (isIOS) {
+    console.log(`📱 iOS video request: ${videoFile}, range: ${range || 'none'}`);
+  }
+  
+  // Set caching and enable range requests
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.setHeader('Accept-Ranges', 'bytes');
+  
+  // iOS Safari REQUIRES these headers for proper video streaming
+  res.setHeader('Content-Type', 'video/mp4');
   
   if (range) {
     // Handle range requests for video seeking
     const parts = range.replace(/bytes=/, '').split('-');
     const start = parseInt(parts[0], 10);
-    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+    // iOS often sends open-ended ranges like "bytes=0-"
+    // We need to respond with a reasonable chunk size for smooth streaming
+    let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+    
+    // iOS optimization: For initial requests, send a larger chunk to help buffering
+    // but not the entire file (too slow on mobile networks)
+    if (!parts[1] && isIOS) {
+      // Send first 5MB or rest of file, whichever is smaller
+      const iosChunkSize = 5 * 1024 * 1024;
+      end = Math.min(start + iosChunkSize, fileSize - 1);
+    }
+    
     const chunkSize = (end - start) + 1;
     
     res.status(206);
     res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
     res.setHeader('Content-Length', chunkSize);
-    res.setHeader('Content-Type', 'video/mp4');
     
     const stream = fs.createReadStream(filePath, { start, end });
     stream.pipe(res);
   } else {
-    // Send entire file
+    // No range header - send with Content-Length for proper progress tracking
+    // iOS Safari may still request without range initially
     res.setHeader('Content-Length', fileSize);
-    res.setHeader('Content-Type', 'video/mp4');
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
   }
