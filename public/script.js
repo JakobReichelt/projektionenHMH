@@ -2,14 +2,58 @@
 // CONFIGURATION & STATE
 // ============================================
 
-const VIDEO_PATHS = {
-  'video1': '/1.mp4?v=2',
-  'video2': '/2.mp4?v=2',
-  'video3-looping': '/3.mp4?v=2',
-  'video4': '/4.mp4?v=2',
-  'video5': '/5.mp4?v=2',
-  'video6-looping': '/6.mp4?v=2'
-};
+// Cookie utilities
+function setCookie(name, value, days = 365) {
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+}
+
+function getCookie(name) {
+  return document.cookie.split('; ').reduce((r, v) => {
+    const parts = v.split('=');
+    return parts[0] === name ? decodeURIComponent(parts[1]) : r;
+  }, '');
+}
+
+// Get show parameter from URL or cookie
+function getShowParameter() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlShow = urlParams.get('show');
+  
+  // If ?show= is in URL, store it in cookie
+  if (urlShow !== null) {
+    if (urlShow === '') {
+      // ?show= (empty) clears the cookie
+      setCookie('show', '', -1);
+      return null;
+    } else {
+      setCookie('show', urlShow);
+      return urlShow;
+    }
+  }
+  
+  // Otherwise, use cookie value
+  const cookieShow = getCookie('show');
+  return cookieShow || null;
+}
+
+// Build video paths with show parameter
+function getVideoPaths() {
+  const showParam = getShowParameter();
+  const baseParams = 'v=2';
+  const showQuery = showParam ? `&show=${encodeURIComponent(showParam)}` : '';
+  
+  return {
+    'video1': `/1.mp4?${baseParams}${showQuery}`,
+    'video2': `/2.mp4?${baseParams}${showQuery}`,
+    'video3-looping': `/3.mp4?${baseParams}${showQuery}`,
+    'video4': `/4.mp4?${baseParams}${showQuery}`,
+    'video5': `/5.mp4?${baseParams}${showQuery}`,
+    'video6-looping': `/6.mp4?${baseParams}${showQuery}`
+  };
+}
+
+const VIDEO_PATHS = getVideoPaths();
 
 const STAGE_FLOW = {
   'video1': { next: 'video2', loop: false },
