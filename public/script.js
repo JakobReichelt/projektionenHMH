@@ -197,12 +197,16 @@ class VideoPlayer {
       this.pending.currentTime = 0;
     }
 
-    // Wait for video to be ready
+    // On mobile/strict browsers, we need to call play() BEFORE awaiting canplay
+    // to preserve the user gesture context. Start playing immediately.
+    const playPromise = this.pending.play();
+
+    // Wait for video to be ready (this will resolve quickly if buffered)
     await this.waitForCanPlay(this.pending);
 
-    // Play video
+    // Now wait for the play promise to complete
     try {
-      await this.pending.play();
+      await playPromise;
       this.hasStartedPlayback = true; // Mark that playback has started
       
       // Send "1" to server when video 1 starts playing
@@ -445,7 +449,10 @@ function handleInteraction() {
   if (state.currentStage === 'video3-looping') {
     log('✋ Video 3 interaction - switching to video 4');
     sendMessage('2'); // Notify server
-    videoPlayer.loadAndPlay('video4');
+    videoPlayer.loadAndPlay('video4').catch(err => {
+      console.error('Failed to switch to video4:', err);
+      log(`❌ Failed to switch to video4: ${err.message}`);
+    });
   } else {
     log(`ℹ️ Interaction ignored - not in interactive stage (current: ${state.currentStage})`);
   }
