@@ -573,7 +573,149 @@ document.addEventListener('keydown', (e) => {
 // STAGE 6 CONTENT OVERLAY
 // ============================================
 
+// Content templates for different shows
+const STAGE6_CONTENT = {
+  NIKI: {
+    topImage: '/assets/NIKI/Rectangle4.png',
+    title: 'Niki de Saint Phalle',
+    intro: [
+      'Farben, Kurven, Lebensfreude – und mittendrin Hannover. Kaum eine Künstlerin hat das Stadtbild so spielerisch geprägt wie Niki de Saint Phalle.',
+      '„I have a very special feeling for Hannover." Dieses Gefühl ist bis heute spürbar. Besonders die berühmten Nanas am Leineufer sind längst mehr als Kunst: Sie gehören zur Stadt wie das Leben selbst.'
+    ],
+    sections: [
+      {
+        title: 'Nanas',
+        image: '/assets/NIKI/nanas3.png',
+        text: 'Die Nanas am Leineufer sind Nikis wohl bekanntestes Geschenk an Hannover. Als sie 1974 aufgestellt wurden, waren sie heftig umstritten – zu bunt, zu groß, zu provokant.<br><br>Heute sind sie unübersehbar und unverzichtbar. Sie stehen für Lebensfreude, Selbstbewusstsein und den Mut, Raum einzunehmen – genau das, wofür Niki de Saint Phalle lebte.'
+      },
+      {
+        title: 'Sprengel',
+        image: '/assets/NIKI/nanas2.png',
+        text: 'Hannover und Niki de Saint Phalle verbindet auch das Sprengel Museum. Durch ihre Schenkungen wurde es zu einem der wichtigsten Orte für ihr Werk weltweit.<br><br>Ausstellungen wie „Love you for Infinity" zeigen bis heute, wie aktuell ihre Themen sind: Liebe, Freiheit, Körper und Politik – direkt, verspielt und kompromisslos.'
+      },
+      {
+        title: 'Niki-Grotte',
+        image: '/assets/NIKI/nanas1.png',
+        text: 'Mitten in den Herrenhäuser Gärten öffnet sich eine kleine Fantasiewelt: die Niki-Grotte. Spiegel, Mosaike und Farben machen sie zu einem begehbaren Kunstwerk voller Überraschungen.<br><br>Sie zeigt, woran Niki glaubte: Kunst darf verzaubern, neugierig machen – und einfach Freude bereiten.',
+        hasCircle: true
+      },
+      {
+        title: 'Niki-<br>Promenade',
+        image: '/assets/NIKI/nanas4.png',
+        text: 'Auch im Alltag ist Niki in Hannover präsent. Die Niki-de-Saint-Phalle-Promenade am Kröpcke trägt ihren Namen – ganz selbstverständlich, mitten in der Stadt.<br><br>Viele gehen täglich darüber hinweg, ohne groß darüber nachzudenken. Und genau das passt perfekt zu Niki: Kunst, die da ist, lebt und begleitet.'
+      }
+    ],
+    bottomImage: '/assets/NIKI/Rectangle1.png',
+    logo: '/assets/NIKI/museum-logo.png',
+    circleImage: '/assets/NIKI/ellipse.svg'
+  },
+  PFERDE: {
+    topImage: '/assets/PFERDE/Rectangle4.png',
+    title: 'Stadt und Ross',
+    intro: [
+      'Pferde gehören zu Hannovers Geschichte wie Straßen, Plätze und Parks. Sie waren Arbeitspartner, Statussymbol und Wirtschaftsfaktor – und haben die Stadt über Jahrhunderte mitgeformt.',
+      'Diese Nähe ist bis heute spürbar. Ob im Stadtbild, im Sport oder ganz konkret auf den Straßen: Die Geschichte der Pferde prägt noch immer das heutige Erleben von Hannover.'
+    ],
+    sections: [
+      {
+        title: 'Hanno-<br>veraner',
+        image: '/assets/PFERDE/pferde1.png',
+        text: 'Der Hannoveraner ist eine der bekanntesten Pferderassen der Welt – und trägt den Namen der Stadt gleich mit. Ursprünglich als kräftiges Arbeitspferd gezüchtet, entwickelte er sich zu einem eleganten und leistungsstarken Sportpferd.<br><br>Bis heute steht der Hannoveraner für Qualität, Verlässlichkeit und internationale Klasse – und macht Hannover weltweit in Ställen und Turnieren sichtbar.'
+      },
+      {
+        title: 'Symbolik',
+        image: '/assets/PFERDE/pferde2.png',
+        text: 'Das weiße Sachsenross im niedersächsischen Wappen ist eines der bekanntesten Pferdesymbole Deutschlands. Es steht für Stärke, Geschichte und regionale Identität – auch in Hannover.<br><br>Bis heute taucht das Pferd in Logos und Namen auf, etwa bei Continental oder dem Conti-Campus. Ein Zeichen dafür, wie selbstverständlich das Pferd Teil der visuellen Sprache der Stadt geblieben ist.'
+      },
+      {
+        title: 'TiHo',
+        image: '/assets/PFERDE/pferde3.png',
+        text: 'Die Tierärztliche Hochschule Hannover wurde im 18. Jahrhundert gegründet, als Pferde für Militär, Landwirtschaft und Transport unverzichtbar waren. Ihre Gesundheit war ein zentrales öffentliches Interesse.<br><br>Die Hochschule steht bis heute für diesen Ursprung: wissenschaftliches Wissen, das aus der engen Verbindung zwischen Stadt, Tier und Gesellschaft entstanden ist.',
+        hasCircle: true
+      },
+      {
+        title: 'Pferde-<br>Bilder',
+        image: '/assets/PFERDE/pferde4.png',
+        text: 'Pferde sind in Hannovers Kunstgeschichte fest verankert. Das Reiterstandbild von König Ernst August vor dem Hauptbahnhof ist seit über 150 Jahren Wahrzeichen, Treffpunkt und Symbol für Hannovers Vergangenheit als Residenzstadt.<br><br>Auch am Leineufer taucht das Pferd in der Kunst auf: Die Skulptur „Mann und Pferd" zeigt die stille Nähe zwischen Mensch und Tier – reduziert, ruhig und eng mit der Geschichte der Stadt verbunden.'
+      }
+    ],
+    bottomImage: '/assets/NIKI/Rectangle1.png',
+    logo: '/assets/NIKI/museum-logo.png',
+    circleImage: '/assets/NIKI/ellipse.svg'
+  }
+};
+
+function loadStage6Content() {
+  const showParam = getShowParameter();
+  const showKey = showParam ? showParam.toUpperCase() : 'NIKI';
+  const content = STAGE6_CONTENT[showKey] || STAGE6_CONTENT.NIKI;
+  
+  const container = document.getElementById('stage6Content');
+  if (!container) return;
+  
+  let html = `
+    <!-- Top Portrait Image -->
+    <div class="top-portrait-section">
+      <img src="${content.topImage}" alt="" class="top-portrait-img">
+    </div>
+    
+    <!-- Main Title -->
+    <h1 class="main-title">${content.title}</h1>
+    
+    <!-- Intro Text -->
+    <div class="intro-text">
+      ${content.intro.map(p => `<p>${p}</p>`).join('\n      ')}
+    </div>
+  `;
+  
+  // Add sections
+  content.sections.forEach((section, index) => {
+    const sectionClass = ['nanas', 'sprengel', 'grotte', 'promenade'][index] || 'section';
+    
+    html += `
+    <!-- ${section.title.replace('<br>', ' ')} Section -->
+    <h2 class="section-title">${section.title}</h2>
+    <div class="${sectionClass}-image-section">
+      <img src="${section.image}" alt="" class="section-img">
+    </div>
+    `;
+    
+    if (section.hasCircle) {
+      html += `
+    <!-- Circle Button -->
+    <div class="circle-button">
+      <img src="${content.circleImage}" alt="" class="circle-svg">
+    </div>
+    `;
+    }
+    
+    html += `
+    <p class="section-text">
+      ${section.text}
+    </p>
+    `;
+  });
+  
+  // Add bottom section
+  html += `
+    <!-- Bottom Section -->
+    <div class="bottom-image-section">
+      <img src="${content.bottomImage}" alt="" class="bottom-img">
+    </div>
+    <div class="bottom-white-bar"></div>
+    
+    <!-- Museum Logo -->
+    <div class="museum-logo-section">
+      <img src="${content.logo}" alt="" class="museum-logo">
+    </div>
+  `;
+  
+  container.innerHTML = html;
+  log(`✓ Stage 6 content loaded for: ${showKey}`);
+}
+
 function showStage6Content() {
+  loadStage6Content();
   const overlay = document.getElementById('stage6Overlay');
   if (overlay) {
     overlay.classList.remove('hidden');

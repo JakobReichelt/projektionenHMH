@@ -213,44 +213,46 @@ body {
     position: absolute;
 }
 
-/* Nanas Section */
+/* Nanas Section (also used for first section in PFERDE) */
 .section-title:nth-of-type(1) {
-    top: 947px;
-    left: 11px;
-    width: 294px;
-    height: 61px;
+    top: 928px;
+    left: 10px;
+    width: 446px;
+    height: 64px;
     z-index: 1;
+    line-height: 0.62;
 }
 
 .nanas-image-section {
-    width: 434px;
-    height: 217px;
-    margin-left: -13px;
+    width: 460px;
+    height: 248px;
+    margin-left: -26px;
     overflow: hidden;
     position: absolute;
-    top: 1020px;
+    top: 1003px;
     z-index: 0;
 }
 
 .section-img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .section-text:nth-of-type(1) {
-    top: 1260px;
+    top: 1262px;
     left: calc(50% - 184px);
     height: 272px;
 }
 
-/* Sprengel Section */
+/* Sprengel Section (also used for second section in PFERDE: Symbolik) */
 .section-title:nth-of-type(2) {
-    top: 1598px;
-    left: 6px;
+    top: 1608px;
+    left: 11px;
     width: 294px;
     height: 64px;
     z-index: 1;
+    line-height: 61px;
 }
 
 .sprengel-image-section {
@@ -268,7 +270,7 @@ body {
     height: 238px;
 }
 
-/* Niki-Grotte Section */
+/* Niki-Grotte Section (also used for third section in PFERDE: TiHo) */
 .section-title:nth-of-type(3) {
     top: 2248px;
     left: 11px;
@@ -279,18 +281,18 @@ body {
 
 .grotte-image-section {
     width: 490px;
-    height: 245px;
+    height: 242px;
     margin-left: -41px;
     overflow: hidden;
     position: absolute;
-    top: 2320px;
+    top: 2279px;
     z-index: 0;
 }
 
 /* Circle Button */
 .circle-button {
     position: absolute;
-    top: 2481px;
+    top: 2535px;
     left: 111px;
     width: 185px;
     height: 64px;
@@ -303,17 +305,17 @@ body {
 }
 
 .section-text:nth-of-type(3) {
-    top: 2590px;
+    top: 2535px;
     height: 136px;
 }
 
-/* Niki-Promenade Section */
+/* Niki-Promenade Section (also used for fourth section in PFERDE: Pferde-Bilder) */
 .section-title:nth-of-type(4) {
     top: 2876px;
     left: 6px;
     width: 527px;
     height: 141px;
-    line-height: 0.697;
+    line-height: 0.836;
     z-index: 1;
 }
 
