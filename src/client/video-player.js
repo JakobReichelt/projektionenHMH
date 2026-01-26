@@ -84,35 +84,20 @@ class VideoPlayer {
     const videoOrder = ['video1', 'video2', 'video3-looping', 'video4', 'video5', 'video6-looping'];
     
     if (this.config.isIOS()) {
-      // iOS: Preload first two videos for immediate playback
-      this.log('iOS detected - preloading first two videos');
+      // iOS: Only register URLs - do NOT load until user interaction
+      this.log('iOS detected - registering video URLs (no preload)');
       
-      // Preload video1 on active element
-      const video1Path = this.config.buildVideoUrl(1, ext, showParam, this.diag.sessionId);
-      this.videoCache.set('video1', video1Path);
-      this.video1.dataset.stage = 'video1';
-      this.video1.src = video1Path;
-      this.video1.preload = 'auto';
-      this.video1.load();
-      this.log('✓ iOS: Preloaded video1 on active element');
-
-      // Preload video2 on pending element (parallel buffering)
-      const video2Path = this.config.buildVideoUrl(2, ext, showParam, this.diag.sessionId);
-      this.videoCache.set('video2', video2Path);
-      this.video2.dataset.stage = 'video2';
-      this.video2.src = video2Path;
-      this.video2.preload = 'auto';
-      this.video2.load();
-      this.log('✓ iOS: Preloaded video2 on pending element');
-      
-      // Register remaining videos
-      for (let i = 2; i < videoOrder.length; i++) {
-        const stageId = videoOrder[i];
+      for (const stageId of videoOrder) {
         const stageNum = this.config.stages[stageId].number;
         const videoPath = this.config.buildVideoUrl(stageNum, ext, showParam, this.diag.sessionId);
         this.videoCache.set(stageId, videoPath);
         this.log(`✓ Registered: ${stageId}`);
       }
+      
+      // Mark video elements as ready for user gesture
+      this.video1.preload = 'none';
+      this.video2.preload = 'none';
+      this.log('⚠️ iOS: Videos will load on user interaction');
     } else {
       // Desktop/Android: Lightweight preload
       for (const stageId of videoOrder) {
@@ -173,6 +158,13 @@ class VideoPlayer {
     targetVideo.dataset.stage = stageId;
     targetVideo.preload = 'auto';
     
+    // iOS: Ensure muted for autoplay compliance
+    if (this.config.isIOS()) {
+      targetVideo.muted = true;
+      targetVideo.setAttribute('muted', '');
+      targetVideo.setAttribute('playsinline', '');
+    }
+    
     // Set source if different
     const currentSrc = targetVideo.src;
     const targetSrc = new URL(videoUrl, window.location.href).href;
@@ -186,14 +178,20 @@ class VideoPlayer {
       }
 
       targetVideo.src = videoUrl;
-      targetVideo.load();
-    } else {
-      // Reuse existing source
-      if (this.config.isIOS() && targetVideo.readyState === 0) {
-        try { targetVideo.load(); } catch {}
+      
+      // iOS: Only call load() if video is not ready
+      if (this.config.isIOS()) {
+        if (targetVideo.readyState === 0) {
+          targetVideo.load();
+        }
       } else {
-        targetVideo.currentTime = 0;
+        targetVideo.load();
       }
+    } else {
+      // Reuse existing source - reset to beginning
+      try {
+        targetVideo.currentTime = 0;
+      } catch {}
     }
 
     // iOS: Pause other video to avoid conflicts
@@ -207,10 +205,11 @@ class VideoPlayer {
       targetVideo === this.video1 ? 'layer1' : 'layer2'
     );
     
-    const playPromise = targetVideo.play();
-    
-    // Wait for video to be ready
+    // Wait for video to be ready FIRST (iOS requirement)
     await this.waitForCanPlay(targetVideo);
+    
+    // Then start playback
+    const playPromise = targetVideo.play();
 
     try {
       await playPromise;
@@ -366,12 +365,14 @@ class VideoPlayer {
 
       const onCanPlay = () => done('canplay');
       const onLoadedData = () => {
+        // iOS can play with loadeddata
         if (this.config.isIOS()) done('loadeddata');
       };
       const onPlaying = () => done('playing');
 
+      // Check current readyState
       if (video.readyState >= 3) return done('readyState>=3');
-      if (this.config.isIOS() && video.readyState >= 2) return done('readyState>=2');
+      if (this.config.isIOS() && video.readyState >= 1) return done('readyState>=1');
 
       video.addEventListener('canplay', onCanPlay, { once: true, passive: true });
       video.addEventListener('loadeddata', onLoadedData, { once: true, passive: true });
