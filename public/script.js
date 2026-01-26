@@ -1151,6 +1151,7 @@ document.getElementById('clearLogBtn')?.addEventListener('click', () => {
 
 let lastInteractionTime = 0;
 const INTERACTION_DEBOUNCE = 300; // ms
+let lastPointerUpTime = 0;
 
 function debouncedInteraction(e) {
   const now = Date.now();
@@ -1163,15 +1164,9 @@ function debouncedInteraction(e) {
 }
 
 // Use touchend instead of touchstart to prevent double-firing with click
-let touchHandled = false;
-
-// Mobile scroll fix:
-// Only treat a *tap* as an interaction. If the user scrolls (finger moves),
-// don't call preventDefault() on touchend — that can break momentum scrolling
-// and intermittently "lock" vertical scrolling on iOS/Android.
-let touchStartX = 0;
-let touchStartY = 0;
-let touchMoved = false;
+// Simplest, scroll-safe input model:
+// - Prefer Pointer Events (covers mouse + touch) without preventDefault()
+// - Fall back to click
 
 function shouldIgnoreGlobalInteractionTarget(target) {
   if (!target || typeof target.closest !== 'function') return false;
@@ -1189,44 +1184,16 @@ function shouldIgnoreGlobalInteractionTarget(target) {
   return false;
 }
 
-document.addEventListener('touchstart', (e) => {
-  const target = e.target;
-  if (shouldIgnoreGlobalInteractionTarget(target)) return;
-  const t = e.changedTouches && e.changedTouches[0];
-  if (!t) return;
-  touchStartX = t.clientX;
-  touchStartY = t.clientY;
-  touchMoved = false;
-}, { passive: true });
-
-document.addEventListener('touchmove', (e) => {
-  const target = e.target;
-  if (shouldIgnoreGlobalInteractionTarget(target)) return;
-  const t = e.changedTouches && e.changedTouches[0];
-  if (!t) return;
-  const dx = Math.abs(t.clientX - touchStartX);
-  const dy = Math.abs(t.clientY - touchStartY);
-
-  // Threshold: treat any meaningful movement as a scroll/drag.
-  if (dx > 10 || dy > 10) touchMoved = true;
-}, { passive: true });
-
-document.addEventListener('touchend', (e) => {
-  const target = e.target;
-  if (shouldIgnoreGlobalInteractionTarget(target)) return;
-  if (touchMoved) return; // Let scroll gestures finish naturally
-
-  e.preventDefault(); // Prevent synthetic click event from firing
-  touchHandled = true;
+document.addEventListener('pointerup', (e) => {
+  if (shouldIgnoreGlobalInteractionTarget(e.target)) return;
+  lastPointerUpTime = Date.now();
   debouncedInteraction(e);
-
-  // Reset flag after a delay
-  setTimeout(() => { touchHandled = false; }, 500);
-}, { passive: false });
+}, { passive: true });
 
 document.addEventListener('click', (e) => {
   if (shouldIgnoreGlobalInteractionTarget(e.target)) return;
-  if (touchHandled) return; // Skip if touch already handled this
+  // If pointer events are supported, a click may follow pointerup.
+  if (lastPointerUpTime && Date.now() - lastPointerUpTime < 600) return;
   debouncedInteraction(e);
 });
 
