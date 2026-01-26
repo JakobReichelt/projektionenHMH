@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Interactive Video Experience</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style-new.css">
 </head>
 <body>
     <!-- Video Container with Double Buffer -->
@@ -21,7 +21,7 @@
     <!-- Stage 6 Content Overlay -->
     <div class="stage6-overlay hidden" id="stage6Overlay">
         <div class="stage6-content" id="stage6Content">
-            <!-- Content will be dynamically loaded based on show parameter -->
+            <!-- Content dynamically loaded based on show parameter -->
         </div>
     </div>
 
@@ -60,7 +60,13 @@
         <div class="message-log" id="messageLog"></div>
     </div>
 
-    <script src="config.js"></script>
-    <script src="script.js"></script>
+    <!-- Modular JavaScript - Order matters! -->
+    <script src="src/client/config.js"></script>
+    <script src="src/client/cookie-utils.js"></script>
+    <script src="src/client/diagnostics.js"></script>
+    <script src="src/client/video-player.js"></script>
+    <script src="src/client/websocket-client.js"></script>
+    <script src="src/client/stage-content.js"></script>
+    <script src="src/client/app.js"></script>
 </body>
 </html>
