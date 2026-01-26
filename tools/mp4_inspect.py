@@ -380,9 +380,56 @@ def convert_mp4_to_hls(
     subprocess.run(cmd, check=True, cwd=str(mp4_path.parent))
 
 
+def faststart_mp4(mp4_path: Path, *, force: bool = False) -> None:
+    """Rewrite MP4 so the 'moov' atom is at the beginning ("fast start").
+
+    Uses ffmpeg stream copy (no re-encode):
+      ffmpeg -i input.mp4 -c copy -movflags +faststart output.mp4
+
+    This greatly improves iOS/Safari startup time for progressive MP4 playback.
+    """
+    if not mp4_path.exists() or not mp4_path.is_file():
+        return
+
+    if not force:
+        rep = inspect_mp4(mp4_path)
+        fast = is_faststart(rep)
+        if fast is True:
+            return
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg not found in PATH. Please install ffmpeg and ensure 'ffmpeg' is available.")
+
+    tmp_path = mp4_path.with_suffix(mp4_path.suffix + ".faststart.tmp")
+    if tmp_path.exists():
+        tmp_path.unlink()
+
+    cmd: List[str] = [
+        ffmpeg,
+        "-hide_banner",
+        "-y",
+        "-i",
+        str(mp4_path),
+        "-c",
+        "copy",
+        "-movflags",
+        "+faststart",
+        str(tmp_path),
+    ]
+
+    subprocess.run(cmd, check=True)
+    os.replace(str(tmp_path), str(mp4_path))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Inspect MP4 structure for iOS/Safari compatibility.")
     parser.add_argument("--assets", default="assets", help="Assets directory to scan")
+    parser.add_argument(
+        "--faststart",
+        action="store_true",
+        help="Rewrite MP4s in-place so the 'moov' atom is at the beginning (requires ffmpeg).",
+    )
     parser.add_argument(
         "--to-hls",
         action="store_true",
@@ -392,7 +439,7 @@ def main() -> int:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Overwrite existing .m3u8/.ts outputs (default: skip if outputs already exist)",
+        help="Force re-processing (HLS: overwrite outputs; faststart: rewrite even if already faststart)",
     )
     parser.add_argument(
         "--transcode",
@@ -434,6 +481,33 @@ def main() -> int:
                 failed += 1
 
         print(f"\nDone. converted={converted}, skipped={skipped}, failed={failed}")
+        return 0 if failed == 0 else 3
+
+    if args.faststart:
+        rewritten = 0
+        skipped = 0
+        failed = 0
+
+        for p in mp4_files:
+            rel = p.relative_to(root).as_posix() if p.is_absolute() else p.as_posix()
+            try:
+                rep = inspect_mp4(p)
+                fast = is_faststart(rep)
+                if not args.force and fast is True:
+                    print(f"SKIP  {rel} (already faststart)")
+                    skipped += 1
+                    continue
+                print(f"FS    {rel}")
+                faststart_mp4(p, force=True)
+                rewritten += 1
+            except subprocess.CalledProcessError as e:
+                print(f"FAIL  {rel} (ffmpeg exit code {e.returncode})")
+                failed += 1
+            except Exception as e:
+                print(f"FAIL  {rel} ({e})")
+                failed += 1
+
+        print(f"\nDone. rewritten={rewritten}, skipped={skipped}, failed={failed}")
         return 0 if failed == 0 else 3
 
     reports = [inspect_mp4(p) for p in mp4_files]

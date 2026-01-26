@@ -105,6 +105,48 @@ function getContentTypeByExt(ext) {
   }
 }
 
+function parseSingleByteRange(rangeHeader, fileSize) {
+  if (typeof rangeHeader !== 'string') return null;
+  if (!rangeHeader.startsWith('bytes=')) return null;
+
+  const spec = rangeHeader.slice('bytes='.length).trim();
+  if (!spec) return null;
+
+  // Multi-range requests (comma-separated) are valid HTTP, but we don't support
+  // multipart/byteranges responses here.
+  if (spec.includes(',')) return { invalid: true };
+
+  const dash = spec.indexOf('-');
+  if (dash === -1) return { invalid: true };
+
+  const startStr = spec.slice(0, dash).trim();
+  const endStr = spec.slice(dash + 1).trim();
+
+  // Suffix range: bytes=-500 (last 500 bytes)
+  if (startStr === '') {
+    const suffixLen = parseInt(endStr, 10);
+    if (Number.isNaN(suffixLen) || suffixLen <= 0) return { invalid: true };
+    const end = fileSize - 1;
+    const start = Math.max(0, fileSize - suffixLen);
+    if (start > end) return { invalid: true };
+    return { start, end };
+  }
+
+  const start = parseInt(startStr, 10);
+  if (Number.isNaN(start) || start < 0) return { invalid: true };
+  if (start >= fileSize) return { invalid: true };
+
+  let end = fileSize - 1;
+  if (endStr !== '') {
+    const parsedEnd = parseInt(endStr, 10);
+    if (!Number.isNaN(parsedEnd)) end = parsedEnd;
+  }
+
+  if (end < start) end = fileSize - 1;
+  end = Math.min(end, fileSize - 1);
+  return { start, end };
+}
+
 // Serve media files (MP4 + HLS) with proper headers.
 // iOS Safari relies on Range requests for MP4 and often performs HEAD probes.
 function handleMediaRequest(req, res, next) {
@@ -160,24 +202,14 @@ function handleMediaRequest(req, res, next) {
 
   // If client asks for a range (MP4/TS), respond with 206 and correct headers
   if (supportsRange && range) {
-    const parts = range.replace(/bytes=/, '').split('-');
-    const start = parseInt(parts[0], 10);
-    let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-
-    // Invalid range -> 416
-    if (Number.isNaN(start) || start < 0 || start >= fileSize) {
+    const parsed = parseSingleByteRange(range, fileSize);
+    if (!parsed || parsed.invalid) {
       res.status(416);
       res.setHeader('Content-Range', `bytes */${fileSize}`);
       return res.end();
     }
 
-    // NOTE: Do not artificially truncate open-ended ranges ("bytes=start-").
-    // Safari may rely on receiving the entire requested range for smooth playback,
-    // especially if the MP4 isn't faststart-optimized.
-
-    // Clamp end
-    if (Number.isNaN(end) || end < start) end = fileSize - 1;
-    end = Math.min(end, fileSize - 1);
+    const { start, end } = parsed;
 
     const chunkSize = (end - start) + 1;
 

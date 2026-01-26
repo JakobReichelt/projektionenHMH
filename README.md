@@ -48,6 +48,18 @@ Optional flags:
 - Transcode to H.264/AAC for max iOS compatibility (slower):
    - `python tools/mp4_inspect.py --assets assets --to-hls --transcode`
 
+## Fix slow MP4 startup on iOS (fast start)
+
+If iOS Safari loads MP4s very slowly, a common cause is that the MP4 metadata (`moov` atom) is at the end of the file.
+
+This tool can rewrite MP4s in-place so playback can start immediately (no re-encode; requires FFmpeg):
+
+- `python tools/mp4_inspect.py --assets assets --faststart`
+
+Or via npm:
+
+- `npm run mp4:faststart`
+
 ## Local testing (Windows)
 
 1. Ensure Node.js is installed (so `node` works in PowerShell).

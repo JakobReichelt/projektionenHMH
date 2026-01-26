@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "hls": "python tools/mp4_inspect.py --assets assets --to-hls"
+    "hls": "python tools/mp4_inspect.py --assets assets --to-hls",
+    "mp4:faststart": "python tools/mp4_inspect.py --assets assets --faststart"
   },
   "keywords": ["websocket", "touchdesigner"],
   "author": "",
