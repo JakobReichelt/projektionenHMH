@@ -40,20 +40,88 @@ const findFolder = (folderName) => {
   return folders.find(f => f.toLowerCase() === folderName.toLowerCase()) || null;
 };
 
-// Serve video files with range request support for better streaming
-// iOS Safari requires proper range request handling and often performs HEAD probes
-function handleVideoRequest(req, res, next) {
-  const videoFile = req.path.slice(1);
-  const requestedShow = req.query.show || DEFAULT_FOLDER;
+// Cookie parsing (no dependency)
+function parseCookies(req) {
+  const header = req.headers.cookie;
+  if (!header) return {};
 
-  if (!requestedShow) return next();
+  const out = {};
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx === -1) continue;
+    const key = part.slice(0, idx).trim();
+    const val = part.slice(idx + 1).trim();
+    if (!key) continue;
+    try {
+      out[key] = decodeURIComponent(val);
+    } catch {
+      out[key] = val;
+    }
+  }
+  return out;
+}
 
-  // Find the actual folder name (case-insensitive)
-  const show = findFolder(requestedShow);
+function getSubdomain(req) {
+  const hostHeader = req.headers.host || '';
+  const host = hostHeader.split(':')[0];
+  if (!host) return null;
+
+  // Ignore localhost and raw IPs
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return null;
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return null;
+
+  const parts = host.split('.').filter(Boolean);
+  if (parts.length < 2) return null;
+  return parts[0] || null;
+}
+
+function setShowCookie(res, show) {
+  if (typeof show !== 'string' || show.length === 0) return;
+  const maxAge = 60 * 60 * 24 * 365;
+  res.setHeader('Set-Cookie', `show=${encodeURIComponent(show)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`);
+}
+
+function resolveShow(req) {
+  const q = typeof req.query.show === 'string' && req.query.show.length > 0 ? req.query.show : null;
+  const cookies = parseCookies(req);
+  const c = typeof cookies.show === 'string' && cookies.show.length > 0 ? cookies.show : null;
+  const s = getSubdomain(req);
+
+  const candidate = q || c || s || DEFAULT_FOLDER;
+  const show = findFolder(candidate);
+  return show || DEFAULT_FOLDER;
+}
+
+function getContentTypeByExt(ext) {
+  switch ((ext || '').toLowerCase()) {
+    case '.mp4':
+      return 'video/mp4';
+    case '.m3u8':
+      return 'application/vnd.apple.mpegurl';
+    case '.ts':
+      return 'video/mp2t';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
+// Serve media files (MP4 + HLS) with proper headers.
+// iOS Safari relies on Range requests for MP4 and often performs HEAD probes.
+function handleMediaRequest(req, res, next) {
+  const mediaFile = req.path.slice(1);
+  const ext = path.extname(mediaFile);
+  const show = resolveShow(req);
 
   if (!show) return next();
 
-  const filePath = path.join(ASSETS_DIR, show, videoFile);
+  // Persist explicit ?show= selections so HLS segment requests
+  // (which usually don't carry ?show=) still resolve correctly.
+  if (typeof req.query.show === 'string' && req.query.show.length > 0) {
+    const normalized = findFolder(req.query.show);
+    if (normalized) setShowCookie(res, normalized);
+  }
+
+  const filePath = path.join(ASSETS_DIR, show, mediaFile);
 
   if (!fs.existsSync(filePath)) return next();
 
@@ -64,22 +132,34 @@ function handleVideoRequest(req, res, next) {
   // iOS Safari specific: Log user agent for debugging
   const userAgent = req.headers['user-agent'] || '';
   const isIOS = /iPhone|iPad|iPod/.test(userAgent);
-  if (isIOS) {
-    console.log(`📱 iOS video request: ${req.method} ${videoFile}, range: ${range || 'none'}`);
+  if (isIOS && (ext === '.mp4' || ext === '.m3u8' || ext === '.ts')) {
+    console.log(`📱 iOS media request: ${req.method} ${mediaFile}, show=${show}, range: ${range || 'none'}`);
   }
 
-  // Set caching and enable range requests
+  // Caching
   res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.setHeader('Accept-Ranges', 'bytes');
-  res.setHeader('Vary', 'Range');
 
-  // iOS Safari REQUIRES these headers for proper video streaming
-  res.setHeader('Content-Type', 'video/mp4');
-  res.setHeader('Content-Length', fileSize);
+  // Content headers
+  res.setHeader('Content-Type', getContentTypeByExt(ext));
   res.setHeader('Last-Modified', stat.mtime.toUTCString());
 
-  // If client asks for a range, respond with 206 and correct headers
-  if (range) {
+  // Range support for MP4 and TS segments
+  const supportsRange = ext === '.mp4' || ext === '.ts';
+  if (supportsRange) {
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Vary', 'Range');
+  }
+
+  // HLS playlists are small text files; serve whole file.
+  if (ext === '.m3u8') {
+    res.setHeader('Content-Length', fileSize);
+    if (req.method === 'HEAD') return res.end();
+    const stream = fs.createReadStream(filePath);
+    return stream.pipe(res);
+  }
+
+  // If client asks for a range (MP4/TS), respond with 206 and correct headers
+  if (supportsRange && range) {
     const parts = range.replace(/bytes=/, '').split('-');
     const start = parseInt(parts[0], 10);
     let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
@@ -112,14 +192,16 @@ function handleVideoRequest(req, res, next) {
   }
 
   // No range header - send full response
+  res.setHeader('Content-Length', fileSize);
   if (req.method === 'HEAD') return res.end();
 
   const stream = fs.createReadStream(filePath);
   return stream.pipe(res);
 }
 
-app.get(/^\/[1-6]\.mp4$/, handleVideoRequest);
-app.head(/^\/[1-6]\.mp4$/, handleVideoRequest);
+// Stage assets (MP4 for most devices, HLS for iOS)
+app.get(/^\/(?:[1-6]\.mp4|[1-6]\.m3u8|[1-6]_\d+\.ts)$/, handleMediaRequest);
+app.head(/^\/(?:[1-6]\.mp4|[1-6]\.m3u8|[1-6]_\d+\.ts)$/, handleMediaRequest);
 
 // Fallback: direct access to asset folders
 app.use('/assets', express.static('assets'));

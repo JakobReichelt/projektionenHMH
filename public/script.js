@@ -42,16 +42,21 @@ function getVideoPaths() {
   const showParam = getShowParameter();
   const baseParams = 'v=2';
   const showQuery = showParam ? `&show=${encodeURIComponent(showParam)}` : '';
+
+  // Use native HLS on iOS Safari to improve loading/startup behavior.
+  // Other browsers keep using MP4 (unless you later add hls.js).
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const ext = isIOS ? 'm3u8' : 'mp4';
   
-  console.log('Building video paths with show parameter:', showParam);
+  console.log('Building video paths with show parameter:', showParam, 'ext:', ext);
   
   return {
-    'video1': `/1.mp4?${baseParams}${showQuery}`,
-    'video2': `/2.mp4?${baseParams}${showQuery}`,
-    'video3-looping': `/3.mp4?${baseParams}${showQuery}`,
-    'video4': `/4.mp4?${baseParams}${showQuery}`,
-    'video5': `/5.mp4?${baseParams}${showQuery}`,
-    'video6-looping': `/6.mp4?${baseParams}${showQuery}`
+    'video1': `/1.${ext}?${baseParams}${showQuery}`,
+    'video2': `/2.${ext}?${baseParams}${showQuery}`,
+    'video3-looping': `/3.${ext}?${baseParams}${showQuery}`,
+    'video4': `/4.${ext}?${baseParams}${showQuery}`,
+    'video5': `/5.${ext}?${baseParams}${showQuery}`,
+    'video6-looping': `/6.${ext}?${baseParams}${showQuery}`
   };
 }
 

@@ -6,7 +6,8 @@ It can also select the video set via a QR-code friendly query parameter: `?show=
 
 ## How it works
 
-- The client requests videos as `/1.mp4` … `/6.mp4`.
+- Non-iOS browsers request videos as `/1.mp4` … `/6.mp4`.
+- iOS/Safari requests HLS playlists as `/1.m3u8` … `/6.m3u8` (which reference `.ts` segments like `/1_000.ts`).
 - The server looks at the request host (e.g. `leibniz.example.com`).
 - If the subdomain matches a folder inside `assets/` (case-insensitive), videos are served from that folder:
    - `leibniz.*` → `assets/LEIBNIZ/1.mp4` … `assets/LEIBNIZ/6.mp4`
@@ -30,6 +31,22 @@ Selection priority when serving `/1.mp4`…`/6.mp4`:
 2. Cookie `show=<key>`
 3. Subdomain (e.g. `niki.example.com`)
 4. Fallback default folder
+
+Selection priority also applies for HLS requests (`/1.m3u8`, `/1_000.ts`, etc.).
+
+## Converting all MP4s to HLS
+
+Install FFmpeg and ensure `ffmpeg` is in your PATH, then run:
+
+- Convert all `assets/**.mp4` to `assets/**.m3u8` + `assets/**_000.ts`… (fast, no re-encode):
+   - `python tools/mp4_inspect.py --assets assets --to-hls`
+
+Optional flags:
+
+- Overwrite existing outputs:
+   - `python tools/mp4_inspect.py --assets assets --to-hls --force`
+- Transcode to H.264/AAC for max iOS compatibility (slower):
+   - `python tools/mp4_inspect.py --assets assets --to-hls --transcode`
 
 ## Local testing (Windows)
 
