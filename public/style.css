@@ -127,29 +127,27 @@ body.stage6-open {
    ============================================ */
 
 .stage6-overlay {
-    /* Fixed container - NOT scrollable */
     position: fixed;
-    inset: 0;
-    background: #000;
-    z-index: 50;
-    overflow: hidden;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-}
-
-.stage6-content {
-    /* This is the ONLY scrollable element */
+    top: 0;
+    left: 0;
     width: 100%;
-    max-width: 390px;
     height: 100vh;
     height: 100dvh;
-    padding: 0 0 100px 0;
     background: #000;
-    color: white;
+    z-index: 50;
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
+}
+
+.stage6-content {
+    width: 390px;
+    max-width: 390px;
+    margin: 0 auto;
+    padding: 0 0 100px 0;
+    background: #000;
+    color: white;
+    position: relative;
 }
 
 /* Top Portrait Section */
