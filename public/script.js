@@ -97,6 +97,54 @@ const VideoDiag = (() => {
     logEl.scrollTop = logEl.scrollHeight;
   };
 
+  const safeStringifyForPanel = (obj) => {
+    try {
+      const json = JSON.stringify(obj, (key, value) => {
+        // Drop very large/noisy fields that don't help in the on-screen log.
+        if (key === 'currentSrc' || key === 'srcAttr' || key === 'userAgent') return undefined;
+        if (key === 'metadata') return undefined;
+        if (key === 'snapshot') return undefined;
+        if (typeof value === 'string' && value.length > 180) return `${value.slice(0, 180)}…`;
+        return value;
+      });
+      if (!json) return '';
+      return json.length > 220 ? `${json.slice(0, 220)}…` : json;
+    } catch {
+      return '';
+    }
+  };
+
+  const panelDataSuffix = (category, message, data) => {
+    if (!data || typeof data !== 'object') return '';
+
+    // Make the debug panel actually actionable without needing the console object view.
+    if (category === 'NET' && typeof message === 'string' && message.startsWith('probe_range')) {
+      const status = data.status ?? '-';
+      const hdr = data.headerMs ?? '-';
+      const total = data.totalMs ?? '-';
+      const tput = data.throughputKiBps ?? '-';
+      const cr = data.contentRange ?? '-';
+      const ar = data.acceptRanges ?? '-';
+      const ct = data.contentType ?? '-';
+      return ` {status:${status} hdr:${hdr}ms total:${total}ms KiBps:${tput} CR:${cr} AR:${ar} CT:${ct}}`;
+    }
+
+    if (category === 'WAIT' || category === 'MEDIA') {
+      // snapshotVideo() shape
+      if ('readyState' in data || 'networkState' in data) {
+        const rs = data.readyState ?? '-';
+        const ns = data.networkState ?? '-';
+        const t = (typeof data.currentTime === 'number') ? data.currentTime.toFixed(2) : (data.currentTime ?? '-');
+        const buf = data.buffered ?? '-';
+        const err = data.error?.code ? ` err:${data.error.code}` : '';
+        return ` {rs:${rs} ns:${ns} t:${t} buf:${buf}${err}}`;
+      }
+    }
+
+    const json = safeStringifyForPanel(data);
+    return json ? ` ${json}` : '';
+  };
+
   const emit = (level, category, message, data) => {
     const n = ++seq;
     const ms = nowMs();
@@ -118,7 +166,8 @@ const VideoDiag = (() => {
     // Mirror into the on-page debug panel (string-only, keep it compact)
     try {
       const wallTime = new Date().toLocaleTimeString();
-      writeToPanel(`[${wallTime}] ${prefix} ${message}`);
+      const suffix = panelDataSuffix(category, message, data);
+      writeToPanel(`[${wallTime}] ${prefix} ${message}${suffix}`);
     } catch {
       // ignore DOM failures
     }
@@ -245,6 +294,18 @@ const VideoDiag = (() => {
       contentRange: resp.headers.get('content-range'),
       contentLength: resp.headers.get('content-length')
     });
+
+    // iOS Safari often stalls if MP4 doesn't respond with 206 + Content-Range.
+    const contentRange = resp.headers.get('content-range');
+    if (resp.status !== 206 || !contentRange) {
+      emit('warn', 'NET', `probe_range_warning ${label}`, {
+        url,
+        status: resp.status,
+        acceptRanges: resp.headers.get('accept-ranges'),
+        contentRange,
+        contentType: resp.headers.get('content-type')
+      });
+    }
   };
 
   const startWaitMonitor = (video, label) => {

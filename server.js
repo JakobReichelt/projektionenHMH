@@ -109,12 +109,12 @@ function parseSingleByteRange(rangeHeader, fileSize) {
   if (typeof rangeHeader !== 'string') return null;
   if (!rangeHeader.startsWith('bytes=')) return null;
 
-  const spec = rangeHeader.slice('bytes='.length).trim();
+  // Safari (and some proxies) may send multi-range headers (comma-separated).
+  // We don't emit multipart/byteranges responses, but we can safely honor the
+  // first range to keep playback working.
+  const rawSpec = rangeHeader.slice('bytes='.length).trim();
+  const spec = rawSpec.includes(',') ? rawSpec.split(',')[0].trim() : rawSpec;
   if (!spec) return null;
-
-  // Multi-range requests (comma-separated) are valid HTTP, but we don't support
-  // multipart/byteranges responses here.
-  if (spec.includes(',')) return { invalid: true };
 
   const dash = spec.indexOf('-');
   if (dash === -1) return { invalid: true };
@@ -200,12 +200,20 @@ function handleMediaRequest(req, res, next) {
     if (!res.writableEnded) finishLog({ closedEarly: true });
   });
 
-  // Caching
-  res.setHeader('Cache-Control', 'public, max-age=3600');
+  // Caching / proxy behavior
+  // no-transform helps prevent intermediary proxies/CDNs from changing payloads,
+  // which can break iOS media pipelines.
+  res.setHeader('Cache-Control', 'public, max-age=3600, no-transform');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
 
   // Content headers
   res.setHeader('Content-Type', getContentTypeByExt(ext));
   res.setHeader('Last-Modified', stat.mtime.toUTCString());
+
+  if (ext === '.mp4') {
+    // Ensure Safari treats it as inline media.
+    res.setHeader('Content-Disposition', 'inline');
+  }
 
   // Range support for MP4 and TS segments
   const supportsRange = ext === '.mp4' || ext === '.ts';
