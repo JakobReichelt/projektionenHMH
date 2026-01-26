@@ -132,9 +132,6 @@ body.stage6-open {
     inset: 0;
     background: #000;
     z-index: 50;
-    width: 100%;
-    height: 100vh;
-    height: 100dvh;
     overflow: hidden;
     display: flex;
     align-items: flex-start;
@@ -143,9 +140,10 @@ body.stage6-open {
 
 .stage6-content {
     /* This is the ONLY scrollable element */
-    width: 390px;
+    width: 100%;
     max-width: 390px;
-    height: 100%;
+    height: 100vh;
+    height: 100dvh;
     padding: 0 0 100px 0;
     background: #000;
     color: white;
