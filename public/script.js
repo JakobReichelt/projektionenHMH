@@ -791,8 +791,9 @@ class VideoPlayer {
 
     log(`⏳ Scheduled preload for: ${nextStage}`);
     
-    // Wait for swap transition (600ms) to complete before touching pending video
-    setTimeout(() => {
+    // Start preloading immediately for faster transitions.
+    // The swap transition is visual (CSS) and doesn't affect the hidden pending video.
+    const runPreload = () => {
        const nextUrl = this.videoCache.get(nextStage) || VIDEO_PATHS[nextStage];
        
        // Verify we are still in the same stage (user hasn't jumped)
@@ -802,7 +803,8 @@ class VideoPlayer {
        // Guard it to reduce the risk of starving the currently playing video.
        if (state.isIOS) {
          const isLoopingStage = !!(STAGE_FLOW[currentStageId] && STAGE_FLOW[currentStageId].loop);
-         const minBuffer = isLoopingStage ? 2 : 8;
+         // Video1 is special: lower threshold so video2 buffers quickly.
+         const minBuffer = isLoopingStage ? 2 : (currentStageId === 'video1' ? 2 : 8);
          const okToPreload = isLoopingStage || this.hasSufficientBuffer(this.active, minBuffer);
 
          if (!okToPreload) {
@@ -835,7 +837,20 @@ class VideoPlayer {
        this.pending.src = nextUrl;
        this.pending.preload = 'auto';
        this.pending.load();
-    }, 1000);
+    };
+
+    // Execute preload logic.
+    // On iOS: if not enough buffer yet, retry after a short delay.
+    runPreload();
+    if (state.isIOS && currentStageId === 'video1') {
+      // Retry mechanism: if video2 didn't start buffering, try again after 500ms.
+      setTimeout(() => {
+        if (state.currentStage === 'video1' && !this.pending.src.includes(VIDEO_PATHS['video2'])) {
+          log(`🔄 iOS: Retrying video2 preload`);
+          runPreload();
+        }
+      }, 500);
+    }
   }
 
   waitForCanPlay(video) {
