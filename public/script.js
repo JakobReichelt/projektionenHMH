@@ -515,6 +515,23 @@ class VideoPlayer {
     this.setupEventListeners();
   }
 
+  hasSufficientBuffer(video, minSeconds = 6) {
+    try {
+      if (!video || typeof video.currentTime !== 'number' || !video.buffered) return false;
+      const t = video.currentTime;
+      for (let i = 0; i < video.buffered.length; i++) {
+        const start = video.buffered.start(i);
+        const end = video.buffered.end(i);
+        if (t >= start && t <= end) {
+          return (end - t) >= minSeconds;
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
   setupEventListeners() {
     const pairs = [
       { video: this.video1, label: 'layer1' },
@@ -781,13 +798,30 @@ class VideoPlayer {
        // Verify we are still in the same stage (user hasn't jumped)
        if (state.currentStage !== currentStageId) return;
 
-       // iOS Safari is very sensitive to parallel media downloads.
-       // Buffering the next stage via a second <video> can starve the current playback
-       // and/or cause long stalls. On iOS we only warm up the connection with HEAD.
+       // iOS: Prefer *actual* buffering of the next stage to avoid cold-start loads.
+       // Guard it to reduce the risk of starving the currently playing video.
        if (state.isIOS) {
-         log(`⬇️ Warming next (HEAD): ${nextStage}`);
+         const isLoopingStage = !!(STAGE_FLOW[currentStageId] && STAGE_FLOW[currentStageId].loop);
+         const minBuffer = isLoopingStage ? 2 : 8;
+         const okToPreload = isLoopingStage || this.hasSufficientBuffer(this.active, minBuffer);
+
+         if (!okToPreload) {
+           log(`⬇️ iOS: Not enough buffer to preload next yet (HEAD only): ${nextStage}`);
+           try {
+             fetch(nextUrl, { method: 'HEAD' }).catch(() => {});
+           } catch {}
+           return;
+         }
+
+         // Preload into the hidden layer (pending) without playing.
+         // This keeps only one <video> playing, but allows the browser to fetch ahead.
+         log(`⬇️ iOS: Buffering next: ${nextStage}`);
          try {
-           fetch(nextUrl, { method: 'HEAD' }).catch(() => {});
+           this.pending.dataset.stage = nextStage;
+           this.pending.preload = 'auto';
+           this.pending.loop = !!(STAGE_FLOW[nextStage] && STAGE_FLOW[nextStage].loop);
+           this.pending.src = nextUrl;
+           this.pending.load();
          } catch {}
          return;
        }
