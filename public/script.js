@@ -573,13 +573,18 @@ class VideoPlayer {
       this.video1.load();
       log(`✓ iOS: Preloaded video1 on active element`);
 
-      // IMPORTANT (iOS/Safari): Do NOT preload multiple videos in parallel.
-      // If HLS is missing and we fall back to MP4, parallel downloads can easily
-      // stall playback for tens of seconds on iPhone.
-      // We'll buffer the next stage later via preloadNext().
+      // CRITICAL: Immediately start preloading video2 on the pending element
+      // This ensures video2 is buffering in parallel with video1, avoiding the
+      // race condition where video1 ends before video2 has even started loading
       const secondVideoPath = VIDEO_PATHS['video2'];
       this.videoCache.set('video2', secondVideoPath);
-      log(`✓ iOS: Registered video2 (deferred preload)`);
+      
+      // Start buffering video2 immediately (don't wait for video1 to finish)
+      this.video2.dataset.stage = 'video2';
+      this.video2.src = secondVideoPath;
+      this.video2.preload = 'auto';
+      this.video2.load();
+      log(`✓ iOS: IMMEDIATELY preloading video2 on pending element`);
       
       // Register remaining videos
       for (let i = 2; i < videoOrder.length; i++) {
@@ -619,6 +624,23 @@ class VideoPlayer {
     if (state.currentStage === stageId && this.hasStartedPlayback) {
       log(`⚠️ Already in stage ${stageId} - ignoring duplicate transition`);
       return false;
+    }
+    
+    // iOS Critical: If transitioning to video2 and pending video isn't ready,
+    // give it a bit more time to buffer
+    if (state.isIOS && stageId === 'video2' && this.pending.readyState < 2) {
+      const pendingSrc = new URL(this.pending.src || '', window.location.href).href;
+      const targetSrc = new URL(VIDEO_PATHS['video2'], window.location.href).href;
+      
+      if (pendingSrc === targetSrc) {
+        log(`⏳ iOS: video2 not ready (readyState: ${this.pending.readyState}), waiting...`);
+        // Wait up to 2 seconds for video2 to buffer
+        const waitStart = Date.now();
+        while (this.pending.readyState < 2 && (Date.now() - waitStart) < 2000) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        log(`📱 iOS: video2 readyState after wait: ${this.pending.readyState}`);
+      }
     }
 
     // Special handling for video5 - show black screen for 16 seconds
@@ -791,7 +813,8 @@ class VideoPlayer {
 
     log(`⏳ Scheduled preload for: ${nextStage}`);
     
-    // Wait for swap transition (600ms) to complete before touching pending video
+    // Reduced delay from 1000ms to 100ms - we need video2 ready ASAP for short video1
+    // iOS Safari needs aggressive preloading to avoid stalls
     setTimeout(() => {
        const nextUrl = this.videoCache.get(nextStage) || VIDEO_PATHS[nextStage];
        
@@ -802,16 +825,18 @@ class VideoPlayer {
        // Reduced buffer requirements to start preloading sooner and improve reliability.
        if (state.isIOS) {
          const isLoopingStage = !!(STAGE_FLOW[currentStageId] && STAGE_FLOW[currentStageId].loop);
-         // Reduced from 8 to 3 seconds for non-looping stages to start buffering sooner
-         const minBuffer = isLoopingStage ? 1 : 3;
-         const okToPreload = isLoopingStage || this.hasSufficientBuffer(this.active, minBuffer);
+         // Critical: video2 must ALWAYS use preload='auto' (never metadata)
+         // because the video1->video2 transition is the most failure-prone
+         const isCriticalTransition = (nextStage === 'video2');
+         const minBuffer = isLoopingStage ? 1 : 2; // Further reduced to 2s
+         const okToPreload = isCriticalTransition || isLoopingStage || this.hasSufficientBuffer(this.active, minBuffer);
 
          if (!okToPreload) {
-           // Even if not enough buffer, start a partial preload to establish connection
-           log(`⬇️ iOS: Low buffer - starting partial preload: ${nextStage}`);
+           // Low buffer but not critical - use metadata preload
+           log(`⬇️ iOS: Low buffer - starting metadata preload: ${nextStage}`);
            try {
              this.pending.dataset.stage = nextStage;
-             this.pending.preload = 'metadata'; // Use metadata instead of HEAD
+             this.pending.preload = 'metadata';
              this.pending.loop = !!(STAGE_FLOW[nextStage] && STAGE_FLOW[nextStage].loop);
              this.pending.src = nextUrl;
              this.pending.load();
@@ -821,7 +846,7 @@ class VideoPlayer {
 
          // Preload into the hidden layer (pending) without playing.
          // This keeps only one <video> playing, but allows the browser to fetch ahead.
-         log(`⬇️ iOS: Buffering next: ${nextStage}`);
+         log(`⬇️ iOS: Buffering next: ${nextStage} ${isCriticalTransition ? '(CRITICAL)' : ''}`);
          try {
            this.pending.dataset.stage = nextStage;
            this.pending.preload = 'auto';
@@ -841,7 +866,7 @@ class VideoPlayer {
        this.pending.src = nextUrl;
        this.pending.preload = 'auto';
        this.pending.load();
-    }, 1000);
+    }, 100);
   }
 
   waitForCanPlay(video) {
