@@ -182,6 +182,12 @@ function handleMediaRequest(req, res, next) {
     console.log(`📱 iOS media request: ${req.method} ${mediaFile}, show=${show}, sid=${sid || '-'}, range=${range || 'none'}`);
   }
 
+  // iOS optimization: Keep connections alive longer to reduce reconnection overhead
+  if (isIOS) {
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Keep-Alive', 'timeout=10, max=100');
+  }
+
   let bytesSent = 0;
   const finishLog = (extra = {}) => {
     if (!shouldLog) return;

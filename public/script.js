@@ -799,16 +799,22 @@ class VideoPlayer {
        if (state.currentStage !== currentStageId) return;
 
        // iOS: Prefer *actual* buffering of the next stage to avoid cold-start loads.
-       // Guard it to reduce the risk of starving the currently playing video.
+       // Reduced buffer requirements to start preloading sooner and improve reliability.
        if (state.isIOS) {
          const isLoopingStage = !!(STAGE_FLOW[currentStageId] && STAGE_FLOW[currentStageId].loop);
-         const minBuffer = isLoopingStage ? 2 : 8;
+         // Reduced from 8 to 3 seconds for non-looping stages to start buffering sooner
+         const minBuffer = isLoopingStage ? 1 : 3;
          const okToPreload = isLoopingStage || this.hasSufficientBuffer(this.active, minBuffer);
 
          if (!okToPreload) {
-           log(`⬇️ iOS: Not enough buffer to preload next yet (HEAD only): ${nextStage}`);
+           // Even if not enough buffer, start a partial preload to establish connection
+           log(`⬇️ iOS: Low buffer - starting partial preload: ${nextStage}`);
            try {
-             fetch(nextUrl, { method: 'HEAD' }).catch(() => {});
+             this.pending.dataset.stage = nextStage;
+             this.pending.preload = 'metadata'; // Use metadata instead of HEAD
+             this.pending.loop = !!(STAGE_FLOW[nextStage] && STAGE_FLOW[nextStage].loop);
+             this.pending.src = nextUrl;
+             this.pending.load();
            } catch {}
            return;
          }
