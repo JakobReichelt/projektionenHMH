@@ -131,6 +131,16 @@ body.stage6-open {
   transition: opacity var(--video-transition);
   will-change: opacity;
   z-index: 1;
+  pointer-events: none; /* Prevent interaction with hidden controls */
+}
+
+/* Hide controls with CSS (Safari compatibility trick - Fix 8) */
+.video-layer::-webkit-media-controls {
+  display: none !important;
+}
+
+.video-layer::-webkit-media-controls-enclosure {
+  display: none !important;
 }
 
 .video-layer.active {
@@ -194,7 +204,7 @@ body.stage6-open {
   width: var(--stage6-width);
   max-width: var(--stage6-max-width);
   margin: 0 auto;
-  padding: 0 0 100px 0;
+  padding: 0 0 200px 0;
   background: var(--color-bg);
   color: var(--color-text);
   position: relative;
@@ -435,7 +445,7 @@ body.stage6-open {
   width: 527px;
   height: 141px;
   line-height: 0.697;
-  z-index: 2;
+  z-index: 3;
 }
 
 [data-show="PFERDE"] .section-title:nth-of-type(4) {
@@ -456,8 +466,7 @@ body.stage6-open {
 .section-text:nth-of-type(4) {
   top: 3236px;
   width: 314px;
-  height: 136px;
-  z-index: 2;
+  z-index: 3;
 }
 
 /* Bottom Section */
