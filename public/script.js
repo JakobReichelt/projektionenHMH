@@ -340,7 +340,8 @@ const state = {
   activeVideo: null,
   pendingVideo: null,
   messageQueue: [], // Queue messages to send when WS connects
-  hlsFallbackStages: new Set() // stages that have fallen back from HLS to MP4
+  hlsFallbackStages: new Set(), // stages that have fallen back from HLS to MP4
+  disableHls: false // if true, prefer MP4 for all stages (iOS only)
 };
 
 // ============================================
@@ -620,29 +621,60 @@ class VideoPlayer {
        // Verify we are still in the same stage (user hasn't jumped)
        if (state.currentStage !== currentStageId) return;
 
-       // Use this.pending which is now free (the hidden video layer)
+       // iOS Safari is very sensitive to parallel media downloads.
+       // Buffering the next stage via a second <video> can starve the current playback
+       // and/or cause long stalls. On iOS we only warm up the connection with HEAD.
+       if (state.isIOS) {
+         log(`⬇️ Warming next (HEAD): ${nextStage}`);
+         try {
+           fetch(nextUrl, { method: 'HEAD' }).catch(() => {});
+         } catch {}
+         return;
+       }
+
+       // Non-iOS: Use this.pending which is now free (the hidden video layer)
        // This allows the browser to buffer the next video while current one plays
        log(`⬇️ Buffering next: ${nextStage}`);
-       
+
        // Set dataset.stage for debug logging
        this.pending.dataset.stage = nextStage;
        this.pending.src = nextUrl;
        this.pending.preload = 'auto';
        this.pending.load();
-       
-       if (state.isIOS) {
-         log(`📱 iOS: Started buffering ${nextStage}`);
-       }
     }, 1000);
   }
 
   waitForCanPlay(video) {
     return new Promise((resolve) => {
-      if (video.readyState >= 3) {
+      const done = (reason) => {
+        try {
+          video.removeEventListener('canplay', onCanPlay);
+          video.removeEventListener('loadeddata', onLoadedData);
+          video.removeEventListener('playing', onPlaying);
+        } catch {}
+        clearTimeout(timeout);
+        if (state.isIOS && reason) {
+          VideoDiag.info('PERF', `waitForCanPlay resolved (${reason})`, VideoDiag.snapshotVideo(video));
+        }
         resolve();
-      } else {
-        video.addEventListener('canplay', resolve, { once: true });
-      }
+      };
+
+      const onCanPlay = () => done('canplay');
+      const onLoadedData = () => {
+        // iOS sometimes never emits canplay, but loadeddata indicates usable frames.
+        if (state.isIOS) return done('loadeddata');
+      };
+      const onPlaying = () => done('playing');
+
+      if (video.readyState >= 3) return done('readyState>=3');
+      if (state.isIOS && video.readyState >= 2) return done('readyState>=2');
+
+      video.addEventListener('canplay', onCanPlay, { once: true, passive: true });
+      video.addEventListener('loadeddata', onLoadedData, { once: true, passive: true });
+      video.addEventListener('playing', onPlaying, { once: true, passive: true });
+
+      const timeoutMs = state.isIOS ? 8000 : 5000;
+      const timeout = setTimeout(() => done('timeout'), timeoutMs);
     });
   }
 
@@ -725,6 +757,24 @@ class VideoPlayer {
     // This covers cases where HLS files aren't present on the server yet, playlist points to
     // wrong segment URLs, or the HLS stream copy produced an incompatible TS.
     if (state.isIOS && code === 4 && typeof video.src === 'string' && video.src.includes('.m3u8')) {
+      // If HLS is failing at all, disable it globally to avoid repeated failures/extra latency.
+      if (!state.disableHls) {
+        state.disableHls = true;
+        log('📱 iOS: HLS failed - disabling HLS globally and switching all stages to MP4');
+        const map = [
+          { id: 'video1', num: 1 },
+          { id: 'video2', num: 2 },
+          { id: 'video3-looping', num: 3 },
+          { id: 'video4', num: 4 },
+          { id: 'video5', num: 5 },
+          { id: 'video6-looping', num: 6 }
+        ];
+        for (const { id, num } of map) {
+          const mp4Url = buildStageUrl(num, 'mp4');
+          this.videoCache.set(id, mp4Url);
+        }
+      }
+
       if (!state.hlsFallbackStages.has(stageId)) {
         state.hlsFallbackStages.add(stageId);
 
