@@ -325,9 +325,13 @@ def convert_mp4_to_hls(
     if not ffmpeg:
         raise RuntimeError("ffmpeg not found in PATH. Please install ffmpeg and ensure 'ffmpeg' is available.")
 
-    playlist_path = mp4_path.with_suffix(".m3u8")
     stem = mp4_path.stem
-    segment_pattern = (mp4_path.parent / f"{stem}_%03d.ts").as_posix()
+    # IMPORTANT: Use basenames in the playlist (e.g. "1_000.ts") so the player
+    # requests "/1_000.ts" when the playlist is served at "/1.m3u8".
+    # If we embed directory paths into the playlist, Safari will request "/assets/..."
+    # which doesn't match our stage routes.
+    playlist_name = f"{stem}.m3u8"
+    segment_pattern = f"{stem}_%03d.ts"
 
     cmd: List[str] = [
         ffmpeg,
@@ -370,10 +374,10 @@ def convert_mp4_to_hls(
         "independent_segments",
         "-hls_segment_filename",
         segment_pattern,
-        str(playlist_path),
+        playlist_name,
     ]
 
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, cwd=str(mp4_path.parent))
 
 
 def main() -> int:

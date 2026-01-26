@@ -38,25 +38,28 @@ function getShowParameter() {
 }
 
 // Build video paths with show parameter
-function getVideoPaths() {
+function buildStageUrl(stageNumber, ext) {
   const showParam = getShowParameter();
   const baseParams = 'v=2';
   const showQuery = showParam ? `&show=${encodeURIComponent(showParam)}` : '';
+  return `/${stageNumber}.${ext}?${baseParams}${showQuery}`;
+}
 
+function getVideoPaths() {
   // Use native HLS on iOS Safari to improve loading/startup behavior.
   // Other browsers keep using MP4 (unless you later add hls.js).
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const ext = isIOS ? 'm3u8' : 'mp4';
   
-  console.log('Building video paths with show parameter:', showParam, 'ext:', ext);
+  console.log('Building video paths ext:', ext);
   
   return {
-    'video1': `/1.${ext}?${baseParams}${showQuery}`,
-    'video2': `/2.${ext}?${baseParams}${showQuery}`,
-    'video3-looping': `/3.${ext}?${baseParams}${showQuery}`,
-    'video4': `/4.${ext}?${baseParams}${showQuery}`,
-    'video5': `/5.${ext}?${baseParams}${showQuery}`,
-    'video6-looping': `/6.${ext}?${baseParams}${showQuery}`
+    'video1': buildStageUrl(1, ext),
+    'video2': buildStageUrl(2, ext),
+    'video3-looping': buildStageUrl(3, ext),
+    'video4': buildStageUrl(4, ext),
+    'video5': buildStageUrl(5, ext),
+    'video6-looping': buildStageUrl(6, ext)
   };
 }
 
@@ -79,7 +82,8 @@ const state = {
   isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent),
   activeVideo: null,
   pendingVideo: null,
-  messageQueue: [] // Queue messages to send when WS connects
+  messageQueue: [], // Queue messages to send when WS connects
+  hlsFallbackStages: new Set() // stages that have fallen back from HLS to MP4
 };
 
 // ============================================
@@ -478,7 +482,32 @@ class VideoPlayer {
     const mediaError = video?.error;
     const code = mediaError?.code;
     const message = mediaError?.message;
-    log(`❌ Error loading video: ${video.dataset.stage || 'unknown'} (code: ${code ?? '-'}${message ? `, msg: ${message}` : ''})`);
+
+    const stageId = video.dataset.stage || 'unknown';
+    log(`❌ Error loading video: ${stageId} (code: ${code ?? '-'}${message ? `, msg: ${message}` : ''})`);
+
+    // iOS Safari: If HLS fails (often code 4 = SRC_NOT_SUPPORTED), automatically retry with MP4.
+    // This covers cases where HLS files aren't present on the server yet, playlist points to
+    // wrong segment URLs, or the HLS stream copy produced an incompatible TS.
+    if (state.isIOS && code === 4 && typeof video.src === 'string' && video.src.includes('.m3u8')) {
+      if (!state.hlsFallbackStages.has(stageId)) {
+        state.hlsFallbackStages.add(stageId);
+
+        const stageNumber = parseInt(stageId.replace(/\D+/g, ''), 10);
+        if (!Number.isNaN(stageNumber) && stageNumber >= 1 && stageNumber <= 6) {
+          const mp4Url = buildStageUrl(stageNumber, 'mp4');
+          log(`↩️ iOS: HLS failed for ${stageId} - retrying MP4`);
+
+          // Update cache so future transitions use MP4 for this stage.
+          this.videoCache.set(stageId, mp4Url);
+
+          try {
+            video.src = mp4Url;
+            video.load();
+          } catch {}
+        }
+      }
+    }
   }
 }
 
