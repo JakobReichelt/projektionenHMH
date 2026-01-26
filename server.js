@@ -5,18 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-
-// Increase server timeout and optimize for video streaming
-const server = http.createServer({
-  // Increase timeout for large video files
-  keepAliveTimeout: 65000,
-  headersTimeout: 66000
-}, app);
-
-// Optimize server settings for better video performance
-server.maxHeadersCount = 0; // No limit on headers
-server.timeout = 0; // No timeout for long downloads
-
+const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 const PORT = process.env.PORT || 8080;
 const ASSETS_DIR = path.join(__dirname, 'assets');
@@ -222,16 +211,6 @@ function handleMediaRequest(req, res, next) {
   // which can break iOS media pipelines.
   res.setHeader('Cache-Control', 'public, max-age=3600, no-transform');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  
-  // Add ETag for better caching (based on file size and mtime)
-  const etag = `"${stat.size.toString(16)}-${stat.mtime.getTime().toString(16)}"`;
-  res.setHeader('ETag', etag);
-  
-  // Handle conditional requests (If-None-Match)
-  if (req.headers['if-none-match'] === etag) {
-    res.status(304);
-    return res.end();
-  }
 
   // Content headers
   res.setHeader('Content-Type', getContentTypeByExt(ext));
@@ -277,18 +256,8 @@ function handleMediaRequest(req, res, next) {
 
     if (req.method === 'HEAD') return res.end();
 
-    // Optimize read stream with larger buffer for better performance on large files
-    const readOptions = { start, end };
-    if (fileSize > 10 * 1024 * 1024) { // For files > 10MB
-      readOptions.highWaterMark = 256 * 1024; // 256KB chunks instead of default 64KB
-    }
-    
-    const stream = fs.createReadStream(filePath, readOptions);
+    const stream = fs.createReadStream(filePath, { start, end });
     stream.on('data', (chunk) => { bytesSent += chunk.length; });
-    stream.on('error', (err) => {
-      console.error(`❌ Stream error for ${mediaFile}:`, err.message);
-      if (!res.headersSent) res.status(500).end();
-    });
     return stream.pipe(res);
   }
 
@@ -296,18 +265,8 @@ function handleMediaRequest(req, res, next) {
   res.setHeader('Content-Length', fileSize);
   if (req.method === 'HEAD') return res.end();
 
-  // Optimize read stream for large files
-  const readOptions = {};
-  if (fileSize > 10 * 1024 * 1024) { // For files > 10MB
-    readOptions.highWaterMark = 256 * 1024; // 256KB chunks
-  }
-  
-  const stream = fs.createReadStream(filePath, readOptions);
+  const stream = fs.createReadStream(filePath);
   stream.on('data', (chunk) => { bytesSent += chunk.length; });
-  stream.on('error', (err) => {
-    console.error(`❌ Stream error for ${mediaFile}:`, err.message);
-    if (!res.headersSent) res.status(500).end();
-  });
   return stream.pipe(res);
 }
 

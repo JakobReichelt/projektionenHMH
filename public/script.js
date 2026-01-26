@@ -573,18 +573,28 @@ class VideoPlayer {
       this.video1.load();
       log(`✓ iOS: Preloaded video1 on active element`);
 
-      // CRITICAL: Immediately start preloading video2 on the pending element
-      // This ensures video2 is buffering in parallel with video1, avoiding the
-      // race condition where video1 ends before video2 has even started loading
+      // Setup video2 with metadata preload first to avoid bandwidth competition
+      // We'll upgrade to full preload once video1 has some buffer
       const secondVideoPath = VIDEO_PATHS['video2'];
       this.videoCache.set('video2', secondVideoPath);
       
-      // Start buffering video2 immediately (don't wait for video1 to finish)
       this.video2.dataset.stage = 'video2';
       this.video2.src = secondVideoPath;
-      this.video2.preload = 'auto';
+      this.video2.preload = 'metadata'; // Start with metadata only
       this.video2.load();
-      log(`✓ iOS: IMMEDIATELY preloading video2 on pending element`);
+      log(`✓ iOS: Set up video2 with metadata preload`);
+      
+      // Upgrade video2 to full preload after video1 has buffered a bit
+      const upgradeVideo2 = () => {
+        if (this.video1.readyState >= 3 || this.hasSufficientBuffer(this.video1, 2)) {
+          this.video2.preload = 'auto';
+          this.video2.load();
+          log(`✓ iOS: Upgraded video2 to auto preload`);
+        } else {
+          setTimeout(upgradeVideo2, 500);
+        }
+      };
+      setTimeout(upgradeVideo2, 1000);
       
       // Register remaining videos
       for (let i = 2; i < videoOrder.length; i++) {
