@@ -120,15 +120,16 @@ body {
    ============================================ */
 
 .stage6-overlay {
-    /* Important: avoid a nested scroll container on mobile.
-       Let the document (body) be the only scroller. */
-    position: relative;
+    /* Fixed position to take over viewport and avoid nested scrolling */
+    position: fixed;
+    inset: 0;
     background: #000;
     z-index: 50;
     width: 100%;
-    min-height: 100vh;
-    min-height: 100dvh;
-    overflow: visible;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .stage6-content {
