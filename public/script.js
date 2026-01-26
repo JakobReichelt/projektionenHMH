@@ -1165,18 +1165,67 @@ function debouncedInteraction(e) {
 // Use touchend instead of touchstart to prevent double-firing with click
 let touchHandled = false;
 
+// Mobile scroll fix:
+// Only treat a *tap* as an interaction. If the user scrolls (finger moves),
+// don't call preventDefault() on touchend — that can break momentum scrolling
+// and intermittently "lock" vertical scrolling on iOS/Android.
+let touchStartX = 0;
+let touchStartY = 0;
+let touchMoved = false;
+
+function shouldIgnoreGlobalInteractionTarget(target) {
+  if (!target || typeof target.closest !== 'function') return false;
+  if (target.closest('.debug-panel, .debug-toggle')) return true;
+
+  // When the Stage 6 overlay is visible, allow normal scrolling and tapping
+  // inside it without advancing stages.
+  const overlay = document.getElementById('stage6Overlay');
+  const stage6Visible = overlay && !overlay.classList.contains('hidden');
+  if (stage6Visible && target.closest('#stage6Overlay')) return true;
+
+  // Don't steal gestures from interactive controls.
+  if (target.closest('a, button, input, textarea, select, label')) return true;
+
+  return false;
+}
+
+document.addEventListener('touchstart', (e) => {
+  const target = e.target;
+  if (shouldIgnoreGlobalInteractionTarget(target)) return;
+  const t = e.changedTouches && e.changedTouches[0];
+  if (!t) return;
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
+  touchMoved = false;
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  const target = e.target;
+  if (shouldIgnoreGlobalInteractionTarget(target)) return;
+  const t = e.changedTouches && e.changedTouches[0];
+  if (!t) return;
+  const dx = Math.abs(t.clientX - touchStartX);
+  const dy = Math.abs(t.clientY - touchStartY);
+
+  // Threshold: treat any meaningful movement as a scroll/drag.
+  if (dx > 10 || dy > 10) touchMoved = true;
+}, { passive: true });
+
 document.addEventListener('touchend', (e) => {
-  if (e.target.closest('.debug-panel, .debug-toggle')) return;
-  e.preventDefault(); // Prevent click event from firing
+  const target = e.target;
+  if (shouldIgnoreGlobalInteractionTarget(target)) return;
+  if (touchMoved) return; // Let scroll gestures finish naturally
+
+  e.preventDefault(); // Prevent synthetic click event from firing
   touchHandled = true;
   debouncedInteraction(e);
-  
+
   // Reset flag after a delay
   setTimeout(() => { touchHandled = false; }, 500);
 }, { passive: false });
 
 document.addEventListener('click', (e) => {
-  if (e.target.closest('.debug-panel, .debug-toggle')) return;
+  if (shouldIgnoreGlobalInteractionTarget(e.target)) return;
   if (touchHandled) return; // Skip if touch already handled this
   debouncedInteraction(e);
 });
