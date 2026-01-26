@@ -252,7 +252,7 @@ body.stage6-open {
 }
 
 [data-show="PFERDE"] .intro-text {
-  top: 612px;
+  top: 614px;
 }
 
 .intro-text p {
@@ -288,6 +288,10 @@ body.stage6-open {
   width: 342px;
   left: 11px;
   position: absolute;
+}
+
+[data-show="PFERDE"] .section-text {
+  font-family: 'Basic Sans', sans-serif;
 }
 
 .section-img {
@@ -360,7 +364,14 @@ body.stage6-open {
   width: 434px;
   height: 217px;
   margin-left: -13px;
-  overflow: hidden;
+ 
+
+[data-show="PFERDE"] .sprengel-image-section {
+  width: 970px;
+  height: 241px;
+  margin-left: -281px;
+  top: 1640px;
+} overflow: hidden;
   position: absolute;
   top: 1654px;
   z-index: 0;

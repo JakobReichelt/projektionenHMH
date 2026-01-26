@@ -45,30 +45,29 @@ const StageContent = {
     topImage: '/assets/PFERDE/Rectangle4.png',
     title: 'Stadt und Ross',
     intro: [
-      'Pferde gehören zu Hannovers Geschichte wie Straßen, Plätze und Parks. Sie waren Arbeitspartner, Statussymbol und Wirtschaftsfaktor – und haben die Stadt über Jahrhunderte mitgeformt.',
-      'Diese Nähe ist bis heute spürbar. Ob im Stadtbild, im Sport oder ganz konkret auf den Straßen: Die Geschichte der Pferde prägt noch immer das heutige Erleben von Hannover.'
+      'Pferde gehören zu Hannovers Geschichte wie Straßen, Plätze und Parks. Sie waren Arbeitspartner, Statussymbol und Wirtschaftsfaktor – und haben die Stadt über Jahrhunderte mitgeformt.\n\nDiese Nähe ist bis heute spürbar. Ob im Stadtbild, im Sport oder ganz konkret auf den Straßen: Die Geschichte der Pferde prägt noch immer das heutige Erleben von Hannover.'
     ],
     sections: [
       {
         title: 'Hanno-<br>veraner',
         image: '/assets/PFERDE/pferde1.png',
-        text: 'Der Hannoveraner ist eine der bekanntesten Pferderassen der Welt – und trägt den Namen der Stadt gleich mit. Ursprünglich als kräftiges Arbeitspferd gezüchtet, entwickelte er sich zu einem eleganten und leistungsstarken Sportpferd.<br><br>Bis heute steht der Hannoveraner für Qualität, Verlässlichkeit und internationale Klasse – und macht Hannover weltweit in Ställen und Turnieren sichtbar.'
+        text: 'Der Hannoveraner ist eine der bekanntesten Pferderassen der Welt – und trägt den Namen der Stadt gleich mit. Ursprünglich als kräftiges Arbeitspferd gezüchtet, entwickelte er sich zu einem eleganten und leistungsstarken Sportpferd.\n\nBis heute steht der Hannoveraner für Qualität, Verlässlichkeit und internationale Klasse – und macht Hannover weltweit in Ställen und Turnieren sichtbar.'
       },
       {
         title: 'Symbolik',
         image: '/assets/PFERDE/pferde2.png',
-        text: 'Das weiße Sachsenross im niedersächsischen Wappen ist eines der bekanntesten Pferdesymbole Deutschlands. Es steht für Stärke, Geschichte und regionale Identität – auch in Hannover.<br><br>Bis heute taucht das Pferd in Logos und Namen auf, etwa bei Continental oder dem Conti-Campus. Ein Zeichen dafür, wie selbstverständlich das Pferd Teil der visuellen Sprache der Stadt geblieben ist.'
+        text: 'Das weiße Sachsenross im niedersächsischen Wappen ist eines der bekanntesten Pferdesymbole Deutschlands. Es steht für Stärke, Geschichte und regionale Identität – auch in Hannover.\n\nBis heute taucht das Pferd in Logos und Namen auf, etwa bei Continental oder dem Conti-Campus. Ein Zeichen dafür, wie selbstverständlich das Pferd Teil der visuellen Sprache der Stadt geblieben ist.'
       },
       {
         title: 'TiHo',
         image: '/assets/PFERDE/pferde3.png',
-        text: 'Die Tierärztliche Hochschule Hannover wurde im 18. Jahrhundert gegründet, als Pferde für Militär, Landwirtschaft und Transport unverzichtbar waren. Ihre Gesundheit war ein zentrales öffentliches Interesse.<br><br>Die Hochschule steht bis heute für diesen Ursprung: wissenschaftliches Wissen, das aus der engen Verbindung zwischen Stadt, Tier und Gesellschaft entstanden ist.',
+        text: 'Die Tierärztliche Hochschule Hannover wurde im 18. Jahrhundert gegründet, als Pferde für Militär, Landwirtschaft und Transport unverzichtbar waren. Ihre Gesundheit war ein zentrales öffentliches Interesse.\n\nDie Hochschule steht bis heute für diesen Ursprung: wissenschaftliches Wissen, das aus der engen Verbindung zwischen Stadt, Tier und Gesellschaft entstanden ist.',
         hasCircle: true
       },
       {
         title: 'Pferde-<br>Bilder',
         image: '/assets/PFERDE/pferde4.png',
-        text: 'Pferde sind in Hannovers Kunstgeschichte fest verankert. Das Reiterstandbild von König Ernst August vor dem Hauptbahnhof ist seit über 150 Jahren Wahrzeichen, Treffpunkt und Symbol für Hannovers Vergangenheit als Residenzstadt.<br><br>Auch am Leineufer taucht das Pferd in der Kunst auf: Die Skulptur „Mann und Pferd" zeigt die stille Nähe zwischen Mensch und Tier – reduziert, ruhig und eng mit der Geschichte der Stadt verbunden.'
+        text: 'Pferde sind in Hannovers Kunstgeschichte fest verankert. Das Reiterstandbild von König Ernst August vor dem Hauptbahnhof ist seit über 150 Jahren Wahrzeichen, Treffpunkt und Symbol für Hannovers Vergangenheit als Residenzstadt.\n\nAuch am Leineufer taucht das Pferd in der Kunst auf: Die Skulptur „Mann und Pferd" zeigt die stille Nähe zwischen Mensch und Tier – reduziert, ruhig und eng mit der Geschichte der Stadt verbunden.'
       }
     ],
     bottomImage: '/assets/NIKI/Rectangle1.png',
