@@ -19,6 +19,14 @@ const VideoDiag = (() => {
     }
   })();
 
+  const shouldForceHls = (() => {
+    try {
+      return new URLSearchParams(window.location.search).get('hls') === '1';
+    } catch {
+      return false;
+    }
+  })();
+
   const isEnabled = () => {
     try {
       return enabledByQuery || window.localStorage.getItem('videoDebug') === '1';
@@ -185,6 +193,74 @@ const VideoDiag = (() => {
     emit('log', 'MEDIA', `${label} attached`, snapshotVideo(video));
   };
 
+  const probeCache = new Set();
+
+  const netProbeRange = async (url, label) => {
+    // Only run probes when explicitly debugging.
+    if (!enabledByQuery) return;
+    if (!url || typeof url !== 'string') return;
+    if (probeCache.has(url)) return;
+    probeCache.add(url);
+
+    const tStart = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    let resp;
+    try {
+      resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          // Small-ish chunk to estimate throughput without downloading full file
+          Range: 'bytes=0-524287'
+        },
+        cache: 'no-store'
+      });
+    } catch (e) {
+      emit('warn', 'NET', `probe_failed ${label}`, { url, error: e && e.message ? e.message : String(e) });
+      return;
+    }
+
+    const tHeaders = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    let bytes = 0;
+    try {
+      const buf = await resp.arrayBuffer();
+      bytes = buf.byteLength;
+    } catch {
+      // ignore
+    }
+    const tDone = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+    const headerMs = tHeaders - tStart;
+    const totalMs = tDone - tStart;
+    const kbps = totalMs > 0 ? (bytes / 1024) / (totalMs / 1000) : null;
+
+    emit('log', 'NET', `probe_range ${label}`, {
+      url,
+      status: resp.status,
+      ok: resp.ok,
+      headerMs: Number(headerMs.toFixed(0)),
+      totalMs: Number(totalMs.toFixed(0)),
+      bytes,
+      throughputKiBps: kbps ? Number(kbps.toFixed(1)) : null,
+      contentType: resp.headers.get('content-type'),
+      acceptRanges: resp.headers.get('accept-ranges'),
+      contentRange: resp.headers.get('content-range'),
+      contentLength: resp.headers.get('content-length')
+    });
+  };
+
+  const startWaitMonitor = (video, label) => {
+    if (!enabledByQuery) return () => {};
+    if (!video) return () => {};
+    let ticks = 0;
+    const id = setInterval(() => {
+      ticks++;
+      emit('log', 'WAIT', `${label}:${video.dataset?.stage || '-'} waiting_tick`, snapshotVideo(video));
+      if (ticks >= 15) {
+        clearInterval(id);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  };
+
   const markSrcSet = (video, stageId, url) => {
     if (!video) return;
     video.__vd = video.__vd || { lastSrcSetAt: null, lastStage: null, firstFrameLogged: false };
@@ -241,7 +317,9 @@ const VideoDiag = (() => {
   window.addEventListener('pageshow', (e) => emit('log', 'LIFECYCLE', 'pageshow', { persisted: e.persisted }));
 
   return {
+    sessionId,
     enabled: isEnabled,
+    shouldForceHls: () => shouldForceHls,
     setEnabled: (v) => {
       try {
         window.localStorage.setItem('videoDebug', v ? '1' : '0');
@@ -255,7 +333,9 @@ const VideoDiag = (() => {
     error: (category, message, data) => emit('error', category, message, data),
     attachVideo,
     markSrcSet,
-    snapshotVideo
+    snapshotVideo,
+    netProbeRange,
+    startWaitMonitor
   };
 })();
 
@@ -299,14 +379,23 @@ function buildStageUrl(stageNumber, ext) {
   const showParam = getShowParameter();
   const baseParams = 'v=2';
   const showQuery = showParam ? `&show=${encodeURIComponent(showParam)}` : '';
-  return `/${stageNumber}.${ext}?${baseParams}${showQuery}`;
+  const sidQuery = (() => {
+    try {
+      return (new URLSearchParams(window.location.search).get('debug') === '1') ? `&sid=${encodeURIComponent(VideoDiag.sessionId)}` : '';
+    } catch {
+      return '';
+    }
+  })();
+  return `/${stageNumber}.${ext}?${baseParams}${showQuery}${sidQuery}`;
 }
 
 function getVideoPaths() {
   // Use native HLS on iOS Safari to improve loading/startup behavior.
   // Other browsers keep using MP4 (unless you later add hls.js).
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const ext = isIOS ? 'm3u8' : 'mp4';
+  // Bigger perspective: HLS is currently failing with MEDIA_ERR_SRC_NOT_SUPPORTED (code 4)
+  // in production. Default iOS to MP4 for reliability, and allow forcing HLS with ?hls=1.
+  const ext = (isIOS && VideoDiag.shouldForceHls()) ? 'm3u8' : 'mp4';
 
   VideoDiag.info('CFG', 'Building video paths', { ext, isIOS });
   
@@ -512,6 +601,13 @@ class VideoPlayer {
 
     if (currentSrc !== targetSrc) {
       VideoDiag.markSrcSet(targetVideo, stageId, videoUrl);
+
+      // When debugging iOS stalls, probe server range performance.
+      // This tells us if the bottleneck is server delivery/TTFB.
+      if (state.isIOS && typeof videoUrl === 'string' && videoUrl.includes('.mp4')) {
+        VideoDiag.netProbeRange(videoUrl, stageId).catch(() => {});
+      }
+
       targetVideo.src = videoUrl;
       targetVideo.load();
       
@@ -543,6 +639,7 @@ class VideoPlayer {
 
     // CRITICAL: On iOS, we must call play() promptly after setting src.
     // iOS Safari may not buffer until play() is called.
+    const stopWaitMonitor = VideoDiag.startWaitMonitor(targetVideo, targetVideo === this.video1 ? 'layer1' : 'layer2');
     const playPromise = targetVideo.play();
     
     if (state.isIOS) {
@@ -555,6 +652,7 @@ class VideoPlayer {
     // Now wait for the play promise to complete
     try {
       await playPromise;
+      stopWaitMonitor();
       this.hasStartedPlayback = true; // Mark that playback has started
       
       // Send "1" to server when video 1 starts playing
@@ -562,6 +660,7 @@ class VideoPlayer {
         sendMessage('1');
       }
     } catch (error) {
+      stopWaitMonitor();
       if (error.name === 'NotAllowedError') {
         log('⚠️ Autoplay blocked - showing interaction prompt');
         showStartOverlay();

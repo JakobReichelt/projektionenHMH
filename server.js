@@ -154,6 +154,9 @@ function handleMediaRequest(req, res, next) {
   const ext = path.extname(mediaFile);
   const show = resolveShow(req);
 
+  const tStart = process.hrtime.bigint();
+  const sid = typeof req.query.sid === 'string' ? req.query.sid : null;
+
   if (!show) return next();
 
   // Persist explicit ?show= selections so HLS segment requests
@@ -174,9 +177,28 @@ function handleMediaRequest(req, res, next) {
   // iOS Safari specific: Log user agent for debugging
   const userAgent = req.headers['user-agent'] || '';
   const isIOS = /iPhone|iPad|iPod/.test(userAgent);
-  if (isIOS && (ext === '.mp4' || ext === '.m3u8' || ext === '.ts')) {
-    console.log(`📱 iOS media request: ${req.method} ${mediaFile}, show=${show}, range: ${range || 'none'}`);
+  const shouldLog = isIOS && (ext === '.mp4' || ext === '.m3u8' || ext === '.ts');
+  if (shouldLog) {
+    console.log(`📱 iOS media request: ${req.method} ${mediaFile}, show=${show}, sid=${sid || '-'}, range=${range || 'none'}`);
   }
+
+  let bytesSent = 0;
+  const finishLog = (extra = {}) => {
+    if (!shouldLog) return;
+    const tEnd = process.hrtime.bigint();
+    const ms = Number((tEnd - tStart) / 1000000n);
+    const status = res.statusCode;
+    console.log(
+      `📱 iOS media response: ${req.method} ${mediaFile}, status=${status}, ms=${ms}, bytes=${bytesSent}, show=${show}, sid=${sid || '-'}, range=${range || 'none'}`,
+      extra
+    );
+  };
+
+  res.on('finish', () => finishLog());
+  res.on('close', () => {
+    // close can happen on aborts; still useful to see partial transfers
+    if (!res.writableEnded) finishLog({ closedEarly: true });
+  });
 
   // Caching
   res.setHeader('Cache-Control', 'public, max-age=3600');
@@ -197,6 +219,7 @@ function handleMediaRequest(req, res, next) {
     res.setHeader('Content-Length', fileSize);
     if (req.method === 'HEAD') return res.end();
     const stream = fs.createReadStream(filePath);
+    stream.on('data', (chunk) => { bytesSent += chunk.length; });
     return stream.pipe(res);
   }
 
@@ -220,6 +243,7 @@ function handleMediaRequest(req, res, next) {
     if (req.method === 'HEAD') return res.end();
 
     const stream = fs.createReadStream(filePath, { start, end });
+    stream.on('data', (chunk) => { bytesSent += chunk.length; });
     return stream.pipe(res);
   }
 
@@ -228,6 +252,7 @@ function handleMediaRequest(req, res, next) {
   if (req.method === 'HEAD') return res.end();
 
   const stream = fs.createReadStream(filePath);
+  stream.on('data', (chunk) => { bytesSent += chunk.length; });
   return stream.pipe(res);
 }
 
