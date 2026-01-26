@@ -207,14 +207,29 @@ function handleMediaRequest(req, res, next) {
   });
 
   // Caching / proxy behavior
-  // no-transform helps prevent intermediary proxies/CDNs from changing payloads,
-  // which can break iOS media pipelines.
-  res.setHeader('Cache-Control', 'public, max-age=3600, no-transform');
+  // Aggressive caching for iOS reliability - assets rarely change
+  // immutable tells iOS it can use cached version without revalidation
+  const cacheAge = 60 * 60 * 24 * 7; // 7 days
+  res.setHeader('Cache-Control', `public, max-age=${cacheAge}, immutable, no-transform`);
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  
+  // ETag for better cache validation
+  const etag = `"${stat.size}-${stat.mtime.getTime()}"`;
+  res.setHeader('ETag', etag);
+  
+  // Handle conditional requests (304 Not Modified)
+  if (req.headers['if-none-match'] === etag) {
+    return res.status(304).end();
+  }
 
   // Content headers
   res.setHeader('Content-Type', getContentTypeByExt(ext));
   res.setHeader('Last-Modified', stat.mtime.toUTCString());
+  
+  // CORS headers for cross-origin requests (helps with iOS restrictions)
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
 
   if (ext === '.mp4') {
     // Ensure Safari treats it as inline media.
@@ -234,6 +249,10 @@ function handleMediaRequest(req, res, next) {
     if (req.method === 'HEAD') return res.end();
     const stream = fs.createReadStream(filePath);
     stream.on('data', (chunk) => { bytesSent += chunk.length; });
+    stream.on('error', (err) => {
+      console.error(`Stream error for ${mediaFile}:`, err);
+      if (!res.headersSent) res.status(500).end();
+    });
     return stream.pipe(res);
   }
 
@@ -256,8 +275,13 @@ function handleMediaRequest(req, res, next) {
 
     if (req.method === 'HEAD') return res.end();
 
-    const stream = fs.createReadStream(filePath, { start, end });
+    // Use optimal chunk size for iOS (64KB is good for mobile)
+    const stream = fs.createReadStream(filePath, { start, end, highWaterMark: 65536 });
     stream.on('data', (chunk) => { bytesSent += chunk.length; });
+    stream.on('error', (err) => {
+      console.error(`Stream error for ${mediaFile}:`, err);
+      if (!res.headersSent) res.status(500).end();
+    });
     return stream.pipe(res);
   }
 
@@ -265,14 +289,26 @@ function handleMediaRequest(req, res, next) {
   res.setHeader('Content-Length', fileSize);
   if (req.method === 'HEAD') return res.end();
 
-  const stream = fs.createReadStream(filePath);
+  // Use optimal chunk size for iOS (64KB is good for mobile)
+  const stream = fs.createReadStream(filePath, { highWaterMark: 65536 });
   stream.on('data', (chunk) => { bytesSent += chunk.length; });
+  stream.on('error', (err) => {
+    console.error(`Stream error for ${mediaFile}:`, err);
+    if (!res.headersSent) res.status(500).end();
+  });
   return stream.pipe(res);
 }
 
 // Stage assets (MP4 for most devices, HLS for iOS)
 app.get(/^\/(?:[1-6]\.mp4|[1-6]\.m3u8|[1-6]_\d+\.ts)$/, handleMediaRequest);
 app.head(/^\/(?:[1-6]\.mp4|[1-6]\.m3u8|[1-6]_\d+\.ts)$/, handleMediaRequest);
+app.options(/^\/(?:[1-6]\.mp4|[1-6]\.m3u8|[1-6]_\d+\.ts)$/, (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Range, If-None-Match');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.status(204).end();
+});
 
 // Fallback: direct access to asset folders
 app.use('/assets', express.static('assets'));
@@ -328,4 +364,11 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 WebSocket: ws://localhost:${PORT}`);
   console.log(`📁 Default assets: ${DEFAULT_FOLDER || 'none'}`);
+  
+  // Optimize HTTP server for iOS media delivery
+  server.keepAliveTimeout = 65000; // Longer than iOS default (60s)
+  server.headersTimeout = 66000; // Slightly longer than keepAliveTimeout
+  server.maxHeadersCount = 100; // Allow more headers for complex requests
+  
+  console.log('✅ Server optimized for iOS media streaming');
 });
