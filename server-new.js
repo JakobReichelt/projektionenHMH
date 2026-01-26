@@ -11,14 +11,14 @@
 
 const express = require('express');
 const http = require('http');
-const config = require('./server/config');
-const utils = require('./server/utils');
-const { createMediaHandler } = require('./server/media-handler');
+const config = require('./src/server/config');
+const utils = require('./src/server/utils');
+const { createMediaHandler } = require('./src/server/media-handler');
 const { 
   createWebSocketServer, 
   createBroadcastHandler, 
   createHealthHandler 
-} = require('./server/websocket-manager');
+} = require('./src/server/websocket-manager');
 
 // Initialize Express app
 const app = express();
