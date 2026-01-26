@@ -745,13 +745,15 @@ class VideoPlayer {
 
   waitForCanPlay(video) {
     return new Promise((resolve) => {
+      let timeout = null;
+
       const done = (reason) => {
         try {
           video.removeEventListener('canplay', onCanPlay);
           video.removeEventListener('loadeddata', onLoadedData);
           video.removeEventListener('playing', onPlaying);
         } catch {}
-        clearTimeout(timeout);
+        if (timeout) clearTimeout(timeout);
         if (state.isIOS && reason) {
           VideoDiag.info('PERF', `waitForCanPlay resolved (${reason})`, VideoDiag.snapshotVideo(video));
         }
@@ -773,7 +775,7 @@ class VideoPlayer {
       video.addEventListener('playing', onPlaying, { once: true, passive: true });
 
       const timeoutMs = state.isIOS ? 8000 : 5000;
-      const timeout = setTimeout(() => done('timeout'), timeoutMs);
+      timeout = setTimeout(() => done('timeout'), timeoutMs);
     });
   }
 
