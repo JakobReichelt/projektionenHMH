@@ -573,28 +573,13 @@ class VideoPlayer {
       this.video1.load();
       log(`✓ iOS: Preloaded video1 on active element`);
 
-      // Setup video2 with metadata preload first to avoid bandwidth competition
-      // We'll upgrade to full preload once video1 has some buffer
+      // IMPORTANT (iOS/Safari): Do NOT preload multiple videos in parallel.
+      // If HLS is missing and we fall back to MP4, parallel downloads can easily
+      // stall playback for tens of seconds on iPhone.
+      // We'll buffer the next stage later via preloadNext().
       const secondVideoPath = VIDEO_PATHS['video2'];
       this.videoCache.set('video2', secondVideoPath);
-      
-      this.video2.dataset.stage = 'video2';
-      this.video2.src = secondVideoPath;
-      this.video2.preload = 'metadata'; // Start with metadata only
-      this.video2.load();
-      log(`✓ iOS: Set up video2 with metadata preload`);
-      
-      // Upgrade video2 to full preload after video1 has buffered a bit
-      const upgradeVideo2 = () => {
-        if (this.video1.readyState >= 3 || this.hasSufficientBuffer(this.video1, 2)) {
-          this.video2.preload = 'auto';
-          this.video2.load();
-          log(`✓ iOS: Upgraded video2 to auto preload`);
-        } else {
-          setTimeout(upgradeVideo2, 500);
-        }
-      };
-      setTimeout(upgradeVideo2, 1000);
+      log(`✓ iOS: Registered video2 (deferred preload)`);
       
       // Register remaining videos
       for (let i = 2; i < videoOrder.length; i++) {
@@ -634,23 +619,6 @@ class VideoPlayer {
     if (state.currentStage === stageId && this.hasStartedPlayback) {
       log(`⚠️ Already in stage ${stageId} - ignoring duplicate transition`);
       return false;
-    }
-    
-    // iOS Critical: If transitioning to video2 and pending video isn't ready,
-    // give it a bit more time to buffer
-    if (state.isIOS && stageId === 'video2' && this.pending.readyState < 2) {
-      const pendingSrc = new URL(this.pending.src || '', window.location.href).href;
-      const targetSrc = new URL(VIDEO_PATHS['video2'], window.location.href).href;
-      
-      if (pendingSrc === targetSrc) {
-        log(`⏳ iOS: video2 not ready (readyState: ${this.pending.readyState}), waiting...`);
-        // Wait up to 2 seconds for video2 to buffer
-        const waitStart = Date.now();
-        while (this.pending.readyState < 2 && (Date.now() - waitStart) < 2000) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        log(`📱 iOS: video2 readyState after wait: ${this.pending.readyState}`);
-      }
     }
 
     // Special handling for video5 - show black screen for 16 seconds
@@ -823,8 +791,7 @@ class VideoPlayer {
 
     log(`⏳ Scheduled preload for: ${nextStage}`);
     
-    // Reduced delay from 1000ms to 100ms - we need video2 ready ASAP for short video1
-    // iOS Safari needs aggressive preloading to avoid stalls
+    // Wait for swap transition (600ms) to complete before touching pending video
     setTimeout(() => {
        const nextUrl = this.videoCache.get(nextStage) || VIDEO_PATHS[nextStage];
        
@@ -835,18 +802,16 @@ class VideoPlayer {
        // Reduced buffer requirements to start preloading sooner and improve reliability.
        if (state.isIOS) {
          const isLoopingStage = !!(STAGE_FLOW[currentStageId] && STAGE_FLOW[currentStageId].loop);
-         // Critical: video2 must ALWAYS use preload='auto' (never metadata)
-         // because the video1->video2 transition is the most failure-prone
-         const isCriticalTransition = (nextStage === 'video2');
-         const minBuffer = isLoopingStage ? 1 : 2; // Further reduced to 2s
-         const okToPreload = isCriticalTransition || isLoopingStage || this.hasSufficientBuffer(this.active, minBuffer);
+         // Reduced from 8 to 3 seconds for non-looping stages to start buffering sooner
+         const minBuffer = isLoopingStage ? 1 : 3;
+         const okToPreload = isLoopingStage || this.hasSufficientBuffer(this.active, minBuffer);
 
          if (!okToPreload) {
-           // Low buffer but not critical - use metadata preload
-           log(`⬇️ iOS: Low buffer - starting metadata preload: ${nextStage}`);
+           // Even if not enough buffer, start a partial preload to establish connection
+           log(`⬇️ iOS: Low buffer - starting partial preload: ${nextStage}`);
            try {
              this.pending.dataset.stage = nextStage;
-             this.pending.preload = 'metadata';
+             this.pending.preload = 'metadata'; // Use metadata instead of HEAD
              this.pending.loop = !!(STAGE_FLOW[nextStage] && STAGE_FLOW[nextStage].loop);
              this.pending.src = nextUrl;
              this.pending.load();
@@ -856,7 +821,7 @@ class VideoPlayer {
 
          // Preload into the hidden layer (pending) without playing.
          // This keeps only one <video> playing, but allows the browser to fetch ahead.
-         log(`⬇️ iOS: Buffering next: ${nextStage} ${isCriticalTransition ? '(CRITICAL)' : ''}`);
+         log(`⬇️ iOS: Buffering next: ${nextStage}`);
          try {
            this.pending.dataset.stage = nextStage;
            this.pending.preload = 'auto';
@@ -876,7 +841,7 @@ class VideoPlayer {
        this.pending.src = nextUrl;
        this.pending.preload = 'auto';
        this.pending.load();
-    }, 100);
+    }, 1000);
   }
 
   waitForCanPlay(video) {
@@ -938,30 +903,26 @@ class VideoPlayer {
   }
 
   swapVideos() {
-    // CRITICAL FIX: Add 'active' to new video BEFORE removing from old
-    // This creates a crossfade instead of a black gap
+    // Ensure pending is ready to become active
+    this.pending.classList.remove('active');
     
-    // 1. First, make sure pending is visible and fading in
+    // Fade out old, fade in new
+    this.active.classList.remove('active');
     this.pending.classList.add('active');
-    
-    // 2. Wait for the fade-in to complete (500ms transition)
-    setTimeout(() => {
-      // 3. Now fade out the old video (they overlap during transition)
-      this.active.classList.remove('active');
-    }, 50); // Small delay to ensure new video is rendering
 
-    // Swap references immediately so state is correct
+    // Swap references
     const temp = this.active;
     this.active = this.pending;
     this.pending = temp;
 
-    // Clean up old video after both transitions complete
+    // Clean up old video after transition
     setTimeout(() => {
       this.pending.pause();
       this.pending.currentTime = 0;
       this.pending.loop = false; // Reset loop attribute
       this.pending.removeAttribute('loop'); // Remove HTML attribute as well
-    }, 600); // Wait for full fade transition
+      this.pending.classList.remove('active'); // Ensure it's hidden
+    }, 600);
   }
 
   onVideoEnded(video) {
@@ -1437,7 +1398,7 @@ function showStage6Content() {
   if (overlay) {
     overlay.classList.remove('hidden');
     document.body.classList.add('stage6-open');
-    // Scroll the overlay to top
+    // Ensure we start at the top of the overlay content
     overlay.scrollTop = 0;
     log('✓ Stage 6 content visible');
   }
