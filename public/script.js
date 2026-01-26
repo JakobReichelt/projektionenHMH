@@ -730,19 +730,6 @@ class VideoPlayer {
     // Now wait for the play promise to complete
     try {
       await playPromise;
-      
-      // CRITICAL: Wait a bit for the video to actually render frames before swapping.
-      // This prevents black flicker when transitioning.
-      await new Promise(resolve => {
-        if (typeof targetVideo.requestVideoFrameCallback === 'function') {
-          // Modern browsers: wait for actual frame
-          targetVideo.requestVideoFrameCallback(() => resolve());
-        } else {
-          // Fallback: small delay to ensure rendering started
-          setTimeout(resolve, 50);
-        }
-      });
-      
       stopWaitMonitor();
       this.hasStartedPlayback = true; // Mark that playback has started
       
@@ -925,28 +912,19 @@ class VideoPlayer {
   }
 
   swapVideos() {
-    // Crossfade approach: new video appears instantly on top, old fades out beneath.
-    // This prevents any black screen gap during transitions.
+    // Ensure pending is ready to become active
+    this.pending.classList.remove('active');
     
-    // Make new video instantly visible (no transition delay)
-    this.pending.style.transition = 'none';
-    this.pending.classList.add('active');
-    
-    // Force a reflow so the instant visibility takes effect
-    void this.pending.offsetHeight;
-    
-    // Re-enable transitions for future fades
-    this.pending.style.transition = '';
-    
-    // Now fade out the old video (it's underneath, so no black gap)
+    // Fade out old, fade in new
     this.active.classList.remove('active');
+    this.pending.classList.add('active');
 
     // Swap references
     const temp = this.active;
     this.active = this.pending;
     this.pending = temp;
 
-    // Clean up old video after transition completes
+    // Clean up old video after transition
     setTimeout(() => {
       this.pending.pause();
       this.pending.currentTime = 0;
