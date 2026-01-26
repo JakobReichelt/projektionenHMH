@@ -48,6 +48,13 @@ body {
     touch-action: pan-y;
 }
 
+/* Prevent body scroll when stage 6 is open */
+body.stage6-open {
+    overflow: hidden !important;
+    height: 100vh;
+    height: 100dvh;
+}
+
 .hidden {
     display: none !important;
 }
