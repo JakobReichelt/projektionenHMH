@@ -82,10 +82,12 @@ body.stage6-open {
     opacity: 0;
     transition: opacity 0.5s ease-in-out;
     will-change: opacity;
+    z-index: 1; /* Both layers at same level for crossfade */
 }
 
 .video-layer.active {
     opacity: 1;
+    z-index: 2; /* Active layer slightly above for clean crossfade */
 }
 
 /* ============================================

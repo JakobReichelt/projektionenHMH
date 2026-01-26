@@ -938,26 +938,30 @@ class VideoPlayer {
   }
 
   swapVideos() {
-    // Ensure pending is ready to become active
-    this.pending.classList.remove('active');
+    // CRITICAL FIX: Add 'active' to new video BEFORE removing from old
+    // This creates a crossfade instead of a black gap
     
-    // Fade out old, fade in new
-    this.active.classList.remove('active');
+    // 1. First, make sure pending is visible and fading in
     this.pending.classList.add('active');
+    
+    // 2. Wait for the fade-in to complete (500ms transition)
+    setTimeout(() => {
+      // 3. Now fade out the old video (they overlap during transition)
+      this.active.classList.remove('active');
+    }, 50); // Small delay to ensure new video is rendering
 
-    // Swap references
+    // Swap references immediately so state is correct
     const temp = this.active;
     this.active = this.pending;
     this.pending = temp;
 
-    // Clean up old video after transition
+    // Clean up old video after both transitions complete
     setTimeout(() => {
       this.pending.pause();
       this.pending.currentTime = 0;
       this.pending.loop = false; // Reset loop attribute
       this.pending.removeAttribute('loop'); // Remove HTML attribute as well
-      this.pending.classList.remove('active'); // Ensure it's hidden
-    }, 600);
+    }, 600); // Wait for full fade transition
   }
 
   onVideoEnded(video) {
