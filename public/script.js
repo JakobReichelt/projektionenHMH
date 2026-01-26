@@ -673,12 +673,6 @@ class VideoPlayer {
     targetVideo.dataset.stage = stageId;
     targetVideo.preload = 'auto';
     
-    // IMPORTANT: Ensure the target video is NOT visible yet to prevent showing stale frames
-    // (e.g., video3 flashing when transitioning from video1 to video2)
-    if (targetVideo === this.pending) {
-      targetVideo.classList.remove('active');
-    }
-    
     // Check if we need to load a new source
     const currentSrc = targetVideo.src;
     const targetSrc = new URL(videoUrl, window.location.href).href;
@@ -959,8 +953,6 @@ class VideoPlayer {
       this.pending.loop = false; // Reset loop attribute
       this.pending.removeAttribute('loop'); // Remove HTML attribute as well
       this.pending.classList.remove('active'); // Ensure it's hidden
-      // Clear the stage data to prevent stale identification
-      this.pending.dataset.stage = '';
     }, 600);
   }
 
