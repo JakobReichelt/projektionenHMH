@@ -41,6 +41,14 @@ body {
     color: white;
 }
 
+/* When Stage 6 content is visible, let the document scroll normally. */
+body.stage6-open {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+}
+
 .hidden {
     display: none !important;
 }
@@ -113,15 +121,15 @@ body {
    ============================================ */
 
 .stage6-overlay {
-    position: fixed;
-    inset: 0;
+    /* Important: avoid a nested scroll container on mobile.
+       Let the document (body) be the only scroller. */
+    position: relative;
     background: #000;
     z-index: 50;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
-    touch-action: pan-y;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
 }
 
 .stage6-content {

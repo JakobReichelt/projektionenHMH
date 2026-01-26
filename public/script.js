@@ -1390,6 +1390,13 @@ function showStage6Content() {
   const overlay = document.getElementById('stage6Overlay');
   if (overlay) {
     overlay.classList.remove('hidden');
+    document.body.classList.add('stage6-open');
+    // Ensure we start at the top of the long content.
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
     log('✓ Stage 6 content visible');
   }
 }
@@ -1399,6 +1406,7 @@ function hideStage6Content() {
   if (overlay) {
     overlay.classList.add('hidden');
   }
+  document.body.classList.remove('stage6-open');
 }
 
 // ============================================
