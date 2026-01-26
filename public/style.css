@@ -131,15 +131,24 @@ body.stage6-open {
   transition: opacity var(--video-transition);
   will-change: opacity;
   z-index: 1;
-  pointer-events: none; /* Prevent interaction with hidden controls */
 }
 
-/* Hide controls with CSS (Safari compatibility trick - Fix 8) */
+/* Completely hide all video controls */
 .video-layer::-webkit-media-controls {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.video-layer::-webkit-media-controls-panel {
   display: none !important;
 }
 
-.video-layer::-webkit-media-controls-enclosure {
+.video-layer::-webkit-media-controls-play-button {
+  display: none !important;
+}
+
+.video-layer::-webkit-media-controls-start-playback-button {
   display: none !important;
 }
 
