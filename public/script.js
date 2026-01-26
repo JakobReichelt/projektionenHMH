@@ -561,7 +561,7 @@ class VideoPlayer {
     
     // iOS-specific aggressive preloading for first video to reduce initial load time
     if (state.isIOS) {
-      log('iOS detected - preloading first video');
+      log('iOS detected - preloading first two videos');
       const firstVideoPath = VIDEO_PATHS['video1'];
       this.videoCache.set('video1', firstVideoPath);
       
@@ -573,13 +573,17 @@ class VideoPlayer {
       this.video1.load();
       log(`✓ iOS: Preloaded video1 on active element`);
 
-      // IMPORTANT (iOS/Safari): Do NOT preload multiple videos in parallel.
-      // If HLS is missing and we fall back to MP4, parallel downloads can easily
-      // stall playback for tens of seconds on iPhone.
-      // We'll buffer the next stage later via preloadNext().
+      // CRITICAL FIX: Preload video2 immediately into the pending element
+      // This prevents the buffering wait when transitioning from video1 to video2
       const secondVideoPath = VIDEO_PATHS['video2'];
       this.videoCache.set('video2', secondVideoPath);
-      log(`✓ iOS: Registered video2 (deferred preload)`);
+      
+      // Load video2 into pending element right away so it buffers in parallel
+      this.video2.dataset.stage = 'video2';
+      this.video2.src = secondVideoPath;
+      this.video2.preload = 'auto';
+      this.video2.load();
+      log(`✓ iOS: Preloaded video2 on pending element (parallel buffering)`);
       
       // Register remaining videos
       for (let i = 2; i < videoOrder.length; i++) {
