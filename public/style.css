@@ -515,7 +515,7 @@ body.stage6-open {
 .debug-toggle {
   position: fixed;
   bottom: 20px;
-  left: 20px;
+  right: 20px;
   width: var(--debug-toggle-size);
   height: var(--debug-toggle-size);
   background: rgba(0, 0, 0, 0.8);
@@ -540,7 +540,7 @@ body.stage6-open {
 .debug-panel {
   position: fixed;
   bottom: 80px;
-  left: 20px;
+  right: 20px;
   width: var(--debug-panel-width);
   max-height: var(--debug-panel-height);
   background: var(--color-debug-bg);
