@@ -34,6 +34,7 @@ console.log('📁 Default show:', defaultFolder || 'none');
 // Middleware
 app.use(express.json());
 app.use(express.static(config.publicDir));
+app.use('/src', express.static('src')); // Serve client modules
 
 // Create media request handler
 const mediaHandler = createMediaHandler(availableFolders, defaultFolder);
