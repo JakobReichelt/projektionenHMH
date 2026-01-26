@@ -11,7 +11,8 @@
     "hls": "python tools/mp4_inspect.py --assets assets --to-hls",
     "hls:force": "python tools/mp4_inspect.py --assets assets --to-hls --force",
     "hls:transcode": "python tools/mp4_inspect.py --assets assets --to-hls --transcode",
-    "mp4:faststart": "python tools/mp4_inspect.py --assets assets --faststart"
+    "mp4:faststart": "python tools/mp4_inspect.py --assets assets --faststart",
+    "test": "echo \"No tests configured yet\" && exit 0"
   },
   "keywords": [
     "websocket",
@@ -24,13 +25,20 @@
   "author": "HMH Kampagne",
   "license": "ISC",
   "dependencies": {
-    "ws": "^8.14.2",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "ws": "^8.14.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
   "engines": {
     "node": ">=20.11.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-repo/websocket-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-repo/websocket-server/issues"
   }
 }
