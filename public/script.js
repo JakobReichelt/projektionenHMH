@@ -1420,11 +1420,12 @@ function loadStage6Content() {
 function showStage6Content() {
   loadStage6Content();
   const overlay = document.getElementById('stage6Overlay');
-  if (overlay) {
+  const content = document.getElementById('stage6Content');
+  if (overlay && content) {
     overlay.classList.remove('hidden');
     document.body.classList.add('stage6-open');
-    // Ensure we start at the top of the overlay content
-    overlay.scrollTop = 0;
+    // Scroll the content element (not the overlay) to top
+    content.scrollTop = 0;
     log('✓ Stage 6 content visible');
   }
 }
