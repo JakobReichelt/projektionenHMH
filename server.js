@@ -71,6 +71,7 @@ function handleVideoRequest(req, res, next) {
   // Set caching and enable range requests
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Vary', 'Range');
 
   // iOS Safari REQUIRES these headers for proper video streaming
   res.setHeader('Content-Type', 'video/mp4');
@@ -90,11 +91,9 @@ function handleVideoRequest(req, res, next) {
       return res.end();
     }
 
-    // iOS optimization: open-ended ranges like "bytes=0-" => send a reasonable chunk
-    if (!parts[1] && isIOS) {
-      const iosChunkSize = 5 * 1024 * 1024;
-      end = Math.min(start + iosChunkSize, fileSize - 1);
-    }
+    // NOTE: Do not artificially truncate open-ended ranges ("bytes=start-").
+    // Safari may rely on receiving the entire requested range for smooth playback,
+    // especially if the MP4 isn't faststart-optimized.
 
     // Clamp end
     if (Number.isNaN(end) || end < start) end = fileSize - 1;

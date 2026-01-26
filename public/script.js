@@ -277,7 +277,15 @@ class VideoPlayer {
       if (state.isIOS) {
         log(`📱 iOS: Reusing already-loaded src for ${stageId}, readyState: ${targetVideo.readyState}`);
       }
-      targetVideo.currentTime = 0;
+      // On iOS Safari, a <video> can report the same src but have readyState 0
+      // (e.g. resource evicted). In that case, force a reload.
+      if (state.isIOS && targetVideo.readyState === 0) {
+        try {
+          targetVideo.load();
+        } catch {}
+      } else {
+        targetVideo.currentTime = 0;
+      }
     }
 
     // iOS Safari is fragile with multiple <video> elements playing at once.
