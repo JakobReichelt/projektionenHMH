@@ -280,8 +280,16 @@ class VideoPlayer {
       targetVideo.currentTime = 0;
     }
 
-    // CRITICAL: On iOS, we must call play() IMMEDIATELY within user gesture context
-    // iOS Safari will NOT buffer videos until play() is called
+    // iOS Safari is fragile with multiple <video> elements playing at once.
+    // When using our double-buffer strategy, ensure only one is playing on iOS.
+    if (state.isIOS && this.active && this.active !== targetVideo && !this.active.paused) {
+      try {
+        this.active.pause();
+      } catch {}
+    }
+
+    // CRITICAL: On iOS, we must call play() promptly after setting src.
+    // iOS Safari may not buffer until play() is called.
     const playPromise = targetVideo.play();
     
     if (state.isIOS) {
@@ -454,7 +462,10 @@ class VideoPlayer {
 
   onVideoError(video, error) {
     console.error('Video error:', error);
-    log(`❌ Error loading video: ${video.dataset.stage || 'unknown'}`);
+    const mediaError = video?.error;
+    const code = mediaError?.code;
+    const message = mediaError?.message;
+    log(`❌ Error loading video: ${video.dataset.stage || 'unknown'} (code: ${code ?? '-'}${message ? `, msg: ${message}` : ''})`);
   }
 }
 

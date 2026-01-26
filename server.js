@@ -41,72 +41,86 @@ const findFolder = (folderName) => {
 };
 
 // Serve video files with range request support for better streaming
-// iOS Safari requires proper range request handling and specific headers
-app.get(/^\/[1-6]\.mp4$/, (req, res, next) => {
+// iOS Safari requires proper range request handling and often performs HEAD probes
+function handleVideoRequest(req, res, next) {
   const videoFile = req.path.slice(1);
   const requestedShow = req.query.show || DEFAULT_FOLDER;
-  
+
   if (!requestedShow) return next();
-  
+
   // Find the actual folder name (case-insensitive)
   const show = findFolder(requestedShow);
-  
+
   if (!show) return next();
-  
+
   const filePath = path.join(ASSETS_DIR, show, videoFile);
-  
+
   if (!fs.existsSync(filePath)) return next();
-  
+
   const stat = fs.statSync(filePath);
   const fileSize = stat.size;
   const range = req.headers.range;
-  
+
   // iOS Safari specific: Log user agent for debugging
   const userAgent = req.headers['user-agent'] || '';
   const isIOS = /iPhone|iPad|iPod/.test(userAgent);
   if (isIOS) {
-    console.log(`📱 iOS video request: ${videoFile}, range: ${range || 'none'}`);
+    console.log(`📱 iOS video request: ${req.method} ${videoFile}, range: ${range || 'none'}`);
   }
-  
+
   // Set caching and enable range requests
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.setHeader('Accept-Ranges', 'bytes');
-  
+
   // iOS Safari REQUIRES these headers for proper video streaming
   res.setHeader('Content-Type', 'video/mp4');
-  
+  res.setHeader('Content-Length', fileSize);
+  res.setHeader('Last-Modified', stat.mtime.toUTCString());
+
+  // If client asks for a range, respond with 206 and correct headers
   if (range) {
-    // Handle range requests for video seeking
     const parts = range.replace(/bytes=/, '').split('-');
     const start = parseInt(parts[0], 10);
-    // iOS often sends open-ended ranges like "bytes=0-"
-    // We need to respond with a reasonable chunk size for smooth streaming
     let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-    
-    // iOS optimization: For initial requests, send a larger chunk to help buffering
-    // but not the entire file (too slow on mobile networks)
+
+    // Invalid range -> 416
+    if (Number.isNaN(start) || start < 0 || start >= fileSize) {
+      res.status(416);
+      res.setHeader('Content-Range', `bytes */${fileSize}`);
+      return res.end();
+    }
+
+    // iOS optimization: open-ended ranges like "bytes=0-" => send a reasonable chunk
     if (!parts[1] && isIOS) {
-      // Send first 5MB or rest of file, whichever is smaller
       const iosChunkSize = 5 * 1024 * 1024;
       end = Math.min(start + iosChunkSize, fileSize - 1);
     }
-    
+
+    // Clamp end
+    if (Number.isNaN(end) || end < start) end = fileSize - 1;
+    end = Math.min(end, fileSize - 1);
+
     const chunkSize = (end - start) + 1;
-    
+
     res.status(206);
     res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
     res.setHeader('Content-Length', chunkSize);
-    
+
+    if (req.method === 'HEAD') return res.end();
+
     const stream = fs.createReadStream(filePath, { start, end });
-    stream.pipe(res);
-  } else {
-    // No range header - send with Content-Length for proper progress tracking
-    // iOS Safari may still request without range initially
-    res.setHeader('Content-Length', fileSize);
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
+    return stream.pipe(res);
   }
-});
+
+  // No range header - send full response
+  if (req.method === 'HEAD') return res.end();
+
+  const stream = fs.createReadStream(filePath);
+  return stream.pipe(res);
+}
+
+app.get(/^\/[1-6]\.mp4$/, handleVideoRequest);
+app.head(/^\/[1-6]\.mp4$/, handleVideoRequest);
 
 // Fallback: direct access to asset folders
 app.use('/assets', express.static('assets'));
