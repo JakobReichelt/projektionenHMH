@@ -2,6 +2,263 @@
 // CONFIGURATION & STATE
 // ============================================
 
+// ============================================
+// DEVTOOLS DIAGNOSTICS LOGGER
+// ============================================
+
+const VideoDiag = (() => {
+  const sessionId = Math.random().toString(16).slice(2, 8);
+  const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  let seq = 0;
+
+  const enabledByQuery = (() => {
+    try {
+      return new URLSearchParams(window.location.search).get('debug') === '1';
+    } catch {
+      return false;
+    }
+  })();
+
+  const isEnabled = () => {
+    try {
+      return enabledByQuery || window.localStorage.getItem('videoDebug') === '1';
+    } catch {
+      return enabledByQuery;
+    }
+  };
+
+  const pad = (n, w = 4) => String(n).padStart(w, '0');
+  const nowMs = () => {
+    const t = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    return t - t0;
+  };
+
+  const fmtRanges = (timeRanges) => {
+    try {
+      if (!timeRanges || typeof timeRanges.length !== 'number' || timeRanges.length === 0) return '[]';
+      const out = [];
+      for (let i = 0; i < timeRanges.length; i++) {
+        out.push(`[${timeRanges.start(i).toFixed(2)}..${timeRanges.end(i).toFixed(2)}]`);
+      }
+      return `[${out.join(' ')}]`;
+    } catch {
+      return '[?]';
+    }
+  };
+
+  const snapshotVideo = (video) => {
+    if (!video) return null;
+    const err = video.error;
+    const playbackQuality = (typeof video.getVideoPlaybackQuality === 'function') ? video.getVideoPlaybackQuality() : null;
+    return {
+      stage: video.dataset?.stage || null,
+      currentSrc: video.currentSrc || null,
+      srcAttr: video.getAttribute ? video.getAttribute('src') : null,
+      preload: video.preload,
+      muted: video.muted,
+      playsInline: video.playsInline,
+      paused: video.paused,
+      ended: video.ended,
+      readyState: video.readyState,
+      networkState: video.networkState,
+      currentTime: Number.isFinite(video.currentTime) ? Number(video.currentTime.toFixed(3)) : null,
+      duration: Number.isFinite(video.duration) ? Number(video.duration.toFixed(3)) : null,
+      buffered: fmtRanges(video.buffered),
+      seekable: fmtRanges(video.seekable),
+      played: fmtRanges(video.played),
+      error: err ? { code: err.code, message: err.message } : null,
+      frameStats: playbackQuality ? {
+        totalVideoFrames: playbackQuality.totalVideoFrames,
+        droppedVideoFrames: playbackQuality.droppedVideoFrames
+      } : null
+    };
+  };
+
+  const writeToPanel = (line) => {
+    const logEl = document.getElementById('messageLog');
+    if (!logEl) return;
+
+    while (logEl.children.length > 200) {
+      logEl.removeChild(logEl.firstChild);
+    }
+
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.textContent = line;
+    logEl.appendChild(entry);
+    logEl.scrollTop = logEl.scrollHeight;
+  };
+
+  const emit = (level, category, message, data) => {
+    const n = ++seq;
+    const ms = nowMs();
+    const prefix = `[VD ${sessionId} #${pad(n)} +${ms.toFixed(0)}ms ${category}]`;
+
+    const hasData = typeof data !== 'undefined' && data !== null;
+
+    // Always log a readable line in DevTools. Attach structured data when available.
+    try {
+      if (hasData) {
+        (console[level] || console.log)(prefix, message, data);
+      } else {
+        (console[level] || console.log)(`${prefix} ${message}`);
+      }
+    } catch {
+      // ignore console failures
+    }
+
+    // Mirror into the on-page debug panel (string-only, keep it compact)
+    try {
+      const wallTime = new Date().toLocaleTimeString();
+      writeToPanel(`[${wallTime}] ${prefix} ${message}`);
+    } catch {
+      // ignore DOM failures
+    }
+  };
+
+  const attachVideo = (video, label) => {
+    if (!video) return;
+    if (video.__vdAttached) return;
+    video.__vdAttached = true;
+    video.__vd = video.__vd || { lastSrcSetAt: null, lastStage: null, firstFrameLogged: false };
+
+    const ev = (type, level = 'log', extra = null) => {
+      video.addEventListener(type, () => {
+        const stage = video.dataset?.stage || null;
+        video.__vd.lastStage = stage;
+
+        const sinceSrc = (typeof video.__vd.lastSrcSetAt === 'number')
+          ? ` +${(nowMs() - video.__vd.lastSrcSetAt).toFixed(0)}ms_since_src`
+          : '';
+
+        const snap = snapshotVideo(video);
+        const msg = `${label}:${stage || '-'} event=${type}${sinceSrc}`;
+
+        // Only spam very chatty events when debug is enabled
+        const noisy = type === 'timeupdate' || type === 'progress';
+        if (noisy && !isEnabled()) return;
+
+        emit(level, 'MEDIA', msg, extra ? { ...snap, ...extra } : snap);
+      }, { passive: true });
+    };
+
+    // Core lifecycle
+    ev('loadstart');
+    ev('loadedmetadata');
+    ev('loadeddata');
+    ev('durationchange');
+    ev('canplay');
+    ev('canplaythrough');
+    ev('play');
+    ev('playing');
+    ev('pause');
+    ev('ended');
+    ev('seeking');
+    ev('seeked');
+    ev('waiting', 'warn');
+    ev('stalled', 'warn');
+    ev('suspend', 'warn');
+    ev('abort', 'warn');
+    ev('emptied', 'warn');
+    ev('error', 'error');
+
+    // Noisy, but extremely useful for iOS HLS/MP4 buffering diagnosis
+    ev('progress');
+    ev('timeupdate');
+
+    // First-frame detection (where supported)
+    if (typeof video.requestVideoFrameCallback === 'function') {
+      const onFirstFrame = () => {
+        if (video.__vd.firstFrameLogged) return;
+        video.__vd.firstFrameLogged = true;
+        video.requestVideoFrameCallback((now, metadata) => {
+          emit('log', 'PERF', `${label}:${video.dataset?.stage || '-'} first_frame`, {
+            now,
+            metadata,
+            snapshot: snapshotVideo(video)
+          });
+        });
+      };
+      video.addEventListener('playing', onFirstFrame, { once: true, passive: true });
+    }
+
+    emit('log', 'MEDIA', `${label} attached`, snapshotVideo(video));
+  };
+
+  const markSrcSet = (video, stageId, url) => {
+    if (!video) return;
+    video.__vd = video.__vd || { lastSrcSetAt: null, lastStage: null, firstFrameLogged: false };
+    video.__vd.lastSrcSetAt = nowMs();
+    video.__vd.lastStage = stageId;
+    video.__vd.firstFrameLogged = false;
+    emit('log', 'MEDIA', `src_set ${stageId}`, { url, snapshot: snapshotVideo(video) });
+  };
+
+  const env = () => {
+    const ua = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    return {
+      userAgent: ua,
+      isIOS,
+      isSafari,
+      online: navigator.onLine,
+      connection: conn ? {
+        effectiveType: conn.effectiveType,
+        downlink: conn.downlink,
+        rtt: conn.rtt,
+        saveData: conn.saveData
+      } : null,
+      debugEnabled: isEnabled()
+    };
+  };
+
+  // Global error hooks (helpful on iOS where failures can be silent)
+  window.addEventListener('error', (e) => {
+    emit('error', 'JS', 'window.error', {
+      message: e.message,
+      filename: e.filename,
+      lineno: e.lineno,
+      colno: e.colno,
+      error: e.error ? { name: e.error.name, message: e.error.message, stack: e.error.stack } : null
+    });
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    emit('error', 'JS', 'unhandledrejection', {
+      reason: e.reason && typeof e.reason === 'object'
+        ? { name: e.reason.name, message: e.reason.message, stack: e.reason.stack }
+        : e.reason
+    });
+  });
+
+  window.addEventListener('online', () => emit('log', 'NET', 'navigator online'));
+  window.addEventListener('offline', () => emit('warn', 'NET', 'navigator offline'));
+  document.addEventListener('visibilitychange', () => {
+    emit('log', 'LIFECYCLE', `visibility=${document.visibilityState}`);
+  });
+  window.addEventListener('pagehide', (e) => emit('warn', 'LIFECYCLE', 'pagehide', { persisted: e.persisted }));
+  window.addEventListener('pageshow', (e) => emit('log', 'LIFECYCLE', 'pageshow', { persisted: e.persisted }));
+
+  return {
+    enabled: isEnabled,
+    setEnabled: (v) => {
+      try {
+        window.localStorage.setItem('videoDebug', v ? '1' : '0');
+      } catch {}
+      emit('log', 'CFG', `videoDebug=${v ? '1' : '0'}`);
+    },
+    env,
+    emit,
+    info: (category, message, data) => emit('log', category, message, data),
+    warn: (category, message, data) => emit('warn', category, message, data),
+    error: (category, message, data) => emit('error', category, message, data),
+    attachVideo,
+    markSrcSet,
+    snapshotVideo
+  };
+})();
+
 // Cookie utilities
 function setCookie(name, value, days = 365) {
   const expires = new Date(Date.now() + days * 864e5).toUTCString();
@@ -50,8 +307,8 @@ function getVideoPaths() {
   // Other browsers keep using MP4 (unless you later add hls.js).
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const ext = isIOS ? 'm3u8' : 'mp4';
-  
-  console.log('Building video paths ext:', ext);
+
+  VideoDiag.info('CFG', 'Building video paths', { ext, isIOS });
   
   return {
     'video1': buildStageUrl(1, ext),
@@ -64,7 +321,7 @@ function getVideoPaths() {
 }
 
 const VIDEO_PATHS = getVideoPaths();
-console.log('Video paths initialized:', VIDEO_PATHS);
+VideoDiag.info('CFG', 'Video paths initialized', VIDEO_PATHS);
 
 const STAGE_FLOW = {
   'video1': { next: 'video2', loop: false },
@@ -108,42 +365,20 @@ class VideoPlayer {
   }
 
   setupEventListeners() {
-    [this.video1, this.video2].forEach(video => {
+    const pairs = [
+      { video: this.video1, label: 'layer1' },
+      { video: this.video2, label: 'layer2' }
+    ];
+
+    pairs.forEach(({ video, label }) => {
+      VideoDiag.attachVideo(video, label);
+
       video.addEventListener('ended', () => this.onVideoEnded(video));
       video.addEventListener('error', (e) => this.onVideoError(video, e));
       video.addEventListener('canplaythrough', () => {
         const stage = video.dataset.stage;
         if (stage) log(`✓ Video buffered: ${stage}`);
       });
-      
-      // iOS debug logging
-      if (state.isIOS) {
-        video.addEventListener('loadstart', () => {
-          log(`📱 iOS loadstart: ${video.dataset.stage || 'unknown'}`);
-        });
-        video.addEventListener('loadedmetadata', () => {
-          log(`📱 iOS loadedmetadata: ${video.dataset.stage || 'unknown'} (duration: ${video.duration}s)`);
-        });
-        video.addEventListener('loadeddata', () => {
-          log(`📱 iOS loadeddata: ${video.dataset.stage || 'unknown'} (readyState: ${video.readyState})`);
-        });
-        video.addEventListener('canplay', () => {
-          log(`📱 iOS canplay: ${video.dataset.stage || 'unknown'} (readyState: ${video.readyState})`);
-        });
-        video.addEventListener('waiting', () => {
-          log(`📱 iOS waiting/buffering: ${video.dataset.stage || 'unknown'}`);
-        });
-        video.addEventListener('stalled', () => {
-          log(`📱 iOS stalled: ${video.dataset.stage || 'unknown'} (networkState: ${video.networkState})`);
-        });
-        video.addEventListener('playing', () => {
-          log(`📱 iOS playing: ${video.dataset.stage || 'unknown'}`);
-        });
-        video.addEventListener('progress', () => {
-          const buffered = video.buffered.length > 0 ? video.buffered.end(0).toFixed(1) : 0;
-          log(`📱 iOS progress: ${video.dataset.stage || 'unknown'} buffered: ${buffered}s`);
-        });
-      }
     });
   }
 
@@ -276,6 +511,7 @@ class VideoPlayer {
     const targetSrc = new URL(videoUrl, window.location.href).href;
 
     if (currentSrc !== targetSrc) {
+      VideoDiag.markSrcSet(targetVideo, stageId, videoUrl);
       targetVideo.src = videoUrl;
       targetVideo.load();
       
@@ -675,19 +911,9 @@ function updateDebugInfo() {
 }
 
 function log(message) {
-  const logEl = document.getElementById('messageLog');
-  if (!logEl) return;
-
-  // Limit log entries
-  while (logEl.children.length > 100) {
-    logEl.removeChild(logEl.firstChild);
-  }
-
-  const entry = document.createElement('div');
-  entry.className = 'log-entry';
-  entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-  logEl.appendChild(entry);
-  logEl.scrollTop = logEl.scrollHeight;
+  // Backwards-compatible helper used across the codebase.
+  // Mirrors to both DevTools console and the on-page debug panel.
+  VideoDiag.emit('log', 'APP', message);
 }
 
 window.toggleDebugPanel = () => {
@@ -921,10 +1147,23 @@ function hideStage6Content() {
 
 window.addEventListener('load', async () => {
   log('Initializing...');
+  VideoDiag.info('ENV', 'Client environment', VideoDiag.env());
   
   // Create video player
   videoPlayer = new VideoPlayer();
   state.activeVideo = videoPlayer.active;
+
+  // Helpful runtime hooks for debugging on iOS via remote DevTools
+  window.__videoDiag = {
+    env: VideoDiag.env,
+    snapshotActive: () => VideoDiag.snapshotVideo(state.activeVideo),
+    snapshot: (which = 1) => {
+      const el = which === 2 ? document.getElementById('video-layer-2') : document.getElementById('video-layer-1');
+      return VideoDiag.snapshotVideo(el);
+    },
+    enableVerbose: () => VideoDiag.setEnabled(true),
+    disableVerbose: () => VideoDiag.setEnabled(false)
+  };
 
   // Connect WebSocket
   connectWebSocket();
