@@ -474,6 +474,7 @@ body.stage6-open {
 
 [data-show="LEIBNIZ"] .section-title:nth-of-type(3) {
   top: 2411px;
+  z-index: 2;
 }
 
 .grotte-image-section {
@@ -505,6 +506,7 @@ body.stage6-open {
 
 [data-show="LEIBNIZ"] .circle-button {
   top: 2644px;
+  z-index: 1;
 }
 
 .circle-svg {
@@ -524,7 +526,7 @@ body.stage6-open {
 
 [data-show="LEIBNIZ"] .section-text:nth-of-type(3) {
   top: 2729px;
-  z-index: 1;
+  z-index: 2;
 }
 
 /* Section 4 */
