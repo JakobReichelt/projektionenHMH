@@ -524,6 +524,7 @@ body.stage6-open {
 
 [data-show="LEIBNIZ"] .section-text:nth-of-type(3) {
   top: 2729px;
+  z-index: 1;
 }
 
 /* Section 4 */
