@@ -75,6 +75,37 @@ const StageContent = {
     circleImage: '/assets/NIKI/ellipse.svg'
   },
 
+  LEIBNIZ: {
+    topImage: '/assets/LEIBNIZ/Rectangle4.png',
+    title: 'Leibniz<br>und<br>Bahlsen',
+    intro: [
+      'Hannover kann mehr als nur Messe und Maschsee – die Stadt ist auch Heimat einer echten Keks-Ikone.',
+      'Hier entstand Ende des 19. Jahrhunderts die Firma Bahlsen, die mit dem Leibniz-Keks ein Produkt schuf, das bis heute in fast jedem Haushalt bekannt ist.',
+      'Stadtgeschichte und Keksdose gehören in Hannover also enger zusammen, als man auf den ersten Blick denkt.'
+    ],
+    sections: [
+      {
+        title: 'Bahlsen',
+        image: '/assets/LEIBNIZ/leibniz2.png',
+        text: '1891 gründete Hermann Bahlsen in Hannover seine „Hannoversche Cakesfabrik". Das Unternehmen wuchs schnell und wurde zu einem wichtigen Arbeitgeber in der Stadt.<br><br>Bahlsen stand nicht nur für Kekse, sondern auch für moderne Arbeitsweisen, Werbung und Industriearchitektur.<br><br>Für viele Hannoveraner*innen war und ist Bahlsen ein fester Teil des Stadtbilds – und ein Stück lokaler Identität.'
+      },
+      {
+        title: 'Leibniz-<br>Keks',
+        image: '/assets/LEIBNIZ/leibniz3.png',
+        text: '1898 brachte Bahlsen den Butterkeks auf den Markt und benannte ihn nach dem Universalgelehrten Gottfried Wilhelm Leibniz – einem der bekanntesten Söhne Hannovers.<br><br>Der Keks war ein Erfolg: einprägsame Form, gleichbleibende Qualität und frühe Markenwerbung machten ihn schnell bekannt.<br><br>Bis heute steht der Leibniz-Keks für Verlässlichkeit, Wiedererkennung und ein bisschen Nostalgie.'
+      },
+      {
+        title: 'Keks-Klau',
+        image: '/assets/LEIBNIZ/leibniz1.png',
+        text: '2013 wurde ein übergroßer, vergoldeter Leibniz-Keks vom Bahlsen-Hauptsitz in Hannover gestohlen. Kurz darauf meldeten sich die Diebe mit einer ungewöhnlichen Forderung: Bahlsen sollte Kekse an soziale Einrichtungen spenden.<br><br>Das Unternehmen ging darauf ein – und der Keks-Krimi wurde zu einer charmanten PR-Geschichte mit Happy End. Später tauchte sogar das Krümelmonster in der Kommunikation auf und zeigte: In Hannover nimmt man selbst einen Keks-Diebstahl mit Humor.',
+        hasCircle: true
+      }
+    ],
+    bottomImage: '/assets/LEIBNIZ/Rectangle1.png',
+    logo: '/assets/LEIBNIZ/museum-logo.png',
+    circleImage: '/assets/LEIBNIZ/ellipse.svg'
+  },
+
   /**
    * Load content for current show
    */
