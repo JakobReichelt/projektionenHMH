@@ -474,7 +474,7 @@ body.stage6-open {
 
 [data-show="LEIBNIZ"] .section-title:nth-of-type(3) {
   top: 2411px;
-  z-index: 2;
+  z-index: 3;
 }
 
 .grotte-image-section {
@@ -494,6 +494,7 @@ body.stage6-open {
 
 [data-show="LEIBNIZ"] .grotte-image-section {
   top: 2467px;
+  z-index: 1;
 }
 
 .circle-button {
@@ -506,7 +507,7 @@ body.stage6-open {
 
 [data-show="LEIBNIZ"] .circle-button {
   top: 2644px;
-  z-index: 1;
+  z-index: 2;
 }
 
 .circle-svg {
@@ -526,7 +527,7 @@ body.stage6-open {
 
 [data-show="LEIBNIZ"] .section-text:nth-of-type(3) {
   top: 2729px;
-  z-index: 2;
+  z-index: 3;
 }
 
 /* Section 4 */
@@ -585,6 +586,7 @@ body.stage6-open {
 [data-show="LEIBNIZ"] .bottom-image-section {
   top: 2578px;
   left: -2px;
+  z-index: -1;
 }
 
 .bottom-img {
